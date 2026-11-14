@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Icono adaptativo para Android 13 en adelante: además del fondo y el
+    adelanto, lleva la capa monocroma, que es la que el launcher tiñe con
+    el color del tema del sistema (íconos con tema).
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background" />
+    <foreground android:drawable="@mipmap/ic_launcher_fg" />
+    <monochrome android:drawable="@mipmap/ic_launcher_mono" />
+</adaptive-icon>

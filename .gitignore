@@ -1,0 +1,34 @@
+# ---------------------------------------------------------------------
+# La clave con la que se firma la app: NUNCA sube a git.
+#
+# Con ese archivo cualquiera podría firmar una versión de "Aura" y
+# publicarla como si fuera la tuya. La clave real está en el disco de
+# Cesar (app/keystore/ahorros.jks) y las contraseñas en local.properties,
+# que tampoco se sube.
+# ---------------------------------------------------------------------
+app/keystore/
+*.jks
+*.keystore
+
+# Rutas de esta máquina: el SDK de Android y las contraseñas.
+local.properties
+
+# Carpeta de build de Gradle.
+.gradle/
+build/
+app/build/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+*.hprof
+
+# Windows
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+.DS_Store

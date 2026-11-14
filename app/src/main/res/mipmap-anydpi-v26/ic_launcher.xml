@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Icono adaptativo (Android 8 en adelante).
+
+    - Fondo: el color oscuro de la app (#0B1020).
+    - Adelante: la cartera con el halo (`ic_launcher_fg.png`), que ya viene
+      con el margen que necesita el recorte redondo del launcher.
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background" />
+    <foreground android:drawable="@mipmap/ic_launcher_fg" />
+</adaptive-icon>

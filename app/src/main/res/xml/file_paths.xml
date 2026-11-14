@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Carpeta que la app puede compartir con otras apps (por ejemplo, para guardar
+  la copia de seguridad en Drive o mandarla por WhatsApp). Solo la caché: los
+  archivos de datos del usuario no se comparten nunca.
+-->
+<paths>
+    <cache-path name="copias" path="." />
+</paths>
