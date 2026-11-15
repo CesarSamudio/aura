@@ -105,4 +105,21 @@ class PreferenciasTest {
 
         assertEquals(listOf("salon11g"), Preferencias(carpeta.root).listasBorradas())
     }
+
+    @Test
+    fun `el archivo de ajustes viejo se sigue leyendo al actualizar la app`() {
+        // Cuando se actualiza la app, el archivo de ajustes que quedó del
+        // teléfono es el viejo: sin ícono y sin las listas borradas. Tiene que
+        // seguir cargando (el tema intacto) y los campos nuevos salen vacíos.
+        val archivo = File(carpeta.root, Preferencias.NOMBRE_ARCHIVO)
+        archivo.writeText("""{"tema":"osmo"}""")
+
+        val preferencias = Preferencias(carpeta.root)
+        assertEquals("osmo", preferencias.temaId())
+        assertNull("El ícono nuevo sale vacío", preferencias.iconoId())
+        assertTrue(
+            "Las listas borradas salen vacías",
+            preferencias.listasBorradas().isEmpty()
+        )
+    }
 }
