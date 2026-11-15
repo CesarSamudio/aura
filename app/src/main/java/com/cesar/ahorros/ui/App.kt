@@ -1,11 +1,15 @@
 package com.cesar.ahorros.ui
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.Icons
@@ -21,6 +25,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,6 +37,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.core.content.FileProvider
@@ -51,14 +59,27 @@ import com.cesar.ahorros.data.Preferencias
 import com.cesar.ahorros.data.Tipo
 import com.cesar.ahorros.dominio.CalculosDeudas
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.time.LocalDateTime
 import java.time.ZoneId
 
-private enum class Pestana(val etiqueta: String, val icono: Int, val tipo: Tipo?) {
-    AHORROS("Ahorros", R.drawable.ic_savings, Tipo.AHORRO),
+/**
+ * La activity que está atrás de un contexto.
+ *
+ * El contexto de Compose puede ser la activity o un wrapper de ella: esto
+ * desenrolla el wrapper para poder llegar a la activity (que es la que sabe
+ * cerrarse cuando el usuario sale de la app).
+ */
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
+
+private enum class Pestana(val etiqueta: String, val icono: Int, val tipo: Tipo?) {    AHORROS("Ahorros", R.drawable.ic_savings, Tipo.AHORRO),
     GASTOS("Gastos", R.drawable.ic_gastos, Tipo.GASTO),
     DEUDAS("Deudas", R.drawable.ic_deudas, null),
     BALANCE("Balance", R.drawable.ic_balance, null)
@@ -109,15 +130,20 @@ fun App() {
     var aBorrarPago by remember { mutableStateOf<Pago?>(null) }
     var comprobanteAVer by remember { mutableStateOf<String?>(null) }
 
+    // ------------------------------------------------------------------
     // La pantalla de ajustes (engranaje arriba a la derecha de Balance).
+    // ------------------------------------------------------------------
     var mostrarAjustes by rememberSaveable { mutableStateOf(false) }
-    var avisoCopia by remember { mutableStateOf<String?>(null) }
+    var aviso by remember { mutableStateOf<String?>(null) }
 
     val avisoGuardado by vm.errorGuardado.collectAsStateWithLifecycle()
     val estadoSnackbar = remember { SnackbarHostState() }
 
     val contexto = LocalContext.current
     val alcance = rememberCoroutineScope()
+    // La activity, para poder cerrar la app cuando el usuario sale con el
+    // botón "atrás".
+    val activity = contexto.findActivity()
 
     // Los ajustes que la app recuerda entre sesiones (por ahora, el tema).
     val preferencias = remember(contexto) { Preferencias(contexto) }
@@ -138,6 +164,55 @@ fun App() {
             "${info.versionName} (${PackageInfoCompat.getLongVersionCode(info)})"
         } catch (e: Throwable) {
             ""
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // El ícono del launcher
+    // ------------------------------------------------------------------
+    // Se aplica cuando la app **sale de la pantalla**, no con la app a la
+    // vista: el MIUI de Xiaomi cierra la app y tira un error si la app cambia
+    // sus componentes (los "alias" del ícono) mientras está en primer plano.
+    // Así el cambio pasa cuando el usuario ya salió de la app.
+    val cicloDeVida = LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(cicloDeVida, iconoActualId) {
+        val observador = LifecycleEventObserver { _, evento ->
+            if (evento == Lifecycle.Event.ON_STOP) {
+                if (IconosApp.hayQueAplicar(contexto, iconoActualId)) {
+                    IconosApp.aplicar(contexto, iconoActualId)
+                }
+            }
+        }
+        cicloDeVida.addObserver(observador)
+        onDispose { cicloDeVida.removeObserver(observador) }
+    }
+
+    // ------------------------------------------------------------------
+    // El botón "atrás" del dispositivo
+    // ------------------------------------------------------------------
+    // En las pantallas de adentro (Ajustes, el detalle de una deuda, agregar
+    // personas) vuelve a la pantalla de al lado; en las 4 pantallas
+    // principales (Ahorros, Gastos, Deudas, Balance) sale de la app, y hace
+    // falta apretarlo dos veces para no cerrarla sin querer.
+    var confirmarSalida by remember { mutableStateOf(false) }
+
+    BackHandler {
+        when {
+            mostrarAjustes -> mostrarAjustes = false
+            vistaDeudas == VistaDeudas.ANADIR_PERSONAS -> vistaDeudas = VistaDeudas.DETALLE
+            deudaAbierta != null -> {
+                vistaDeudas = VistaDeudas.LISTA
+                deudaAbierta = null
+            }
+            confirmarSalida -> activity?.finish()
+            else -> {
+                confirmarSalida = true
+                aviso = "Presioná de nuevo para salir."
+                alcance.launch {
+                    delay(2000)
+                    confirmarSalida = false
+                }
+            }
         }
     }
 
@@ -166,7 +241,7 @@ fun App() {
                     copia.delete()
                     restaurado
                 }
-                avisoCopia = if (ok) {
+                aviso = if (ok) {
                     "Copia restaurada. Cerrá y abrí la app para ver los datos."
                 } else {
                     "No se pudo restaurar esa copia."
@@ -175,10 +250,10 @@ fun App() {
         }
     }
 
-    LaunchedEffect(avisoCopia) {
-        avisoCopia?.let { mensaje ->
+    LaunchedEffect(aviso) {
+        aviso?.let { mensaje ->
             estadoSnackbar.showSnackbar(mensaje)
-            avisoCopia = null
+            aviso = null
         }
     }
 
@@ -285,7 +360,17 @@ fun App() {
                     onCambiarIcono = { id ->
                         iconoActualId = id
                         preferencias.guardarIcono(id)
-                        IconosApp.aplicar(contexto, id)
+                        if (IconosApp.hayQueAplicar(contexto, id)) {
+                            if (IconosApp.esXiaomi()) {
+                                // En los teléfonos de Xiaomi (MIUI) cambiar el
+                                // ícono con la app a la vista cierra la app:
+                                // se aplica cuando el usuario sale.
+                                aviso = "Listo. En tu teléfono el ícono cambia al salir de la app."
+                            } else {
+                                IconosApp.aplicar(contexto, id)
+                                aviso = "Listo. Cambió el ícono de la app."
+                            }
+                        }
                     },
                     onVolver = { mostrarAjustes = false },
                     onExportar = {
@@ -293,7 +378,7 @@ fun App() {
                         // usuario lo guarda en Drive, WhatsApp, correo...
                         val zip = CopiaLocal.crearZip(contexto)
                         if (zip == null) {
-                            avisoCopia = "No se pudo preparar la copia."
+                            aviso = "No se pudo preparar la copia."
                         } else {
                             try {
                                 val uri = FileProvider.getUriForFile(
@@ -310,7 +395,7 @@ fun App() {
                                     Intent.createChooser(enviar, "Guardar o compartir la copia")
                                 )
                             } catch (e: Exception) {
-                                avisoCopia = "No se pudo compartir la copia."
+                                aviso = "No se pudo compartir la copia."
                             }
                         }
                     },

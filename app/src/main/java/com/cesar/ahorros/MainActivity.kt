@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
-import com.cesar.ahorros.data.IconosApp
 import com.cesar.ahorros.data.Preferencias
 import com.cesar.ahorros.ui.App
 import com.cesar.ahorros.ui.TemaActual
@@ -26,9 +25,10 @@ class MainActivity : ComponentActivity() {
         // app no aparece con el tema viejo y cambia al nuevo delante de él.
         TemaActual.aplicar(preferencias.temaId())
 
-        // El ícono del launcher: se deja como el usuario lo eligió. Esto solo
-        // hace falta si algo lo descolocó (una reinstalación, por ejemplo).
-        IconosApp.asegurar(this, preferencias.iconoId())
+        // El ícono del launcher NO se toca acá a propósito: los ROMs que
+        // cierran la app cuando cambia sus componentes (MIUI) lo hacen
+        // mientras la app está a la vista. Se aplica cuando el usuario sale
+        // de la app (ver `IconosApp` y el `App.kt`).
 
         // El fondo de la ventana sigue al tema: en los temas claros no debe
         // verse un destello negro mientras se abre la app.

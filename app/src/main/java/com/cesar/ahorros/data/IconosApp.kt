@@ -3,6 +3,7 @@ package com.cesar.ahorros.data
 import android.content.ComponentName
 import android.content.Context
 import android.content.pm.PackageManager
+import android.os.Build
 import androidx.annotation.DrawableRes
 import com.cesar.ahorros.R
 
@@ -88,58 +89,86 @@ object IconosApp {
     /**
      * Deja el logo elegido como el único habilitado.
      *
-     * Se habilita el nuevo **antes** de deshabilitar los otros: si se hiciera
-     * al revés hay un instante en que la app no tiene ícono, y algunos
-     * launchers la esconden de la pantalla de inicio.
+     * Devuelve `true` si quedó aplicado.
+     *
+     * - Se habilita el nuevo **antes** de deshabilitar los otros: si se hiciera
+     *   al revés hay un instante en que la app no tiene ícono, y algunos
+     *   launchers la esconden de la pantalla de inicio.
+     * - Si el sistema no deja cambiarlo (algunos ROMs, como el MIUI de Xiaomi,
+     *   bloquean esto y cierran la app), se **deshace**: vuelve a quedar el
+     *   ícono de antes y no se quedan dos íconos en la pantalla de inicio.
+     *
+     * OJO: esto se llama cuando la app **sale de la pantalla**, no mientras
+     * está a la vista. Ver [hayQueAplicar].
      */
-    fun aplicar(context: Context, id: String) {
-        val pm = context.packageManager
-        val paquete = context.packageName
+    fun aplicar(contexto: Context, id: String): Boolean {
+        val pm = contexto.packageManager
+        val paquete = contexto.packageName
         val elegido = numeroDe(id)
 
         // 1. El que se quiere, habilitado.
         val nuevo = ComponentName(paquete, aliasDe(elegido))
-        if (!estaHabilitado(pm, nuevo, porDefecto = elegido == 1)) {
-            pm.setComponentEnabledSetting(
-                nuevo,
-                PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
-                PackageManager.DONT_KILL_APP
-            )
+        if (!cambiar(pm, nuevo, PackageManager.COMPONENT_ENABLED_STATE_ENABLED)) {
+            return false
         }
 
         // 2. Los otros, deshabilitados.
         for (numero in 1..TOTAL) {
             if (numero == elegido) continue
             val otro = ComponentName(paquete, aliasDe(numero))
-            if (estaHabilitado(pm, otro, porDefecto = numero == 1)) {
-                pm.setComponentEnabledSetting(
-                    otro,
-                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-                    PackageManager.DONT_KILL_APP
-                )
+            if (!cambiar(pm, otro, PackageManager.COMPONENT_ENABLED_STATE_DISABLED)) {
+                // No se pudo: se vuelve atrás para no dejar dos íconos.
+                cambiar(pm, nuevo, PackageManager.COMPONENT_ENABLED_STATE_DISABLED)
+                return false
             }
         }
+        return true
     }
 
     /**
-     * Deja el ícono como estaba en el preference, sin tocar nada si ya está
-     * bien. Se llama al abrir la app: después de una actualización o de una
-     * reinstalación, el alias habilitado puede no ser el que el usuario había
-     * elegido.
+     * Si el ícono de la pantalla de inicio todavía no es el que el usuario
+     * eligió.
+     *
+     * Esto se pregunta **antes** de tocar nada: si ya está como tiene que
+     * estar, no se hace ninguna llamada al sistema. Y eso es lo que evita el
+     * problema del MIUI, que cierra la app cuando cambia sus componentes
+     * mientras está en primer plano.
      */
-    fun asegurar(context: Context, id: String?) {
-        val elegido = numeroDe(id ?: CatalogoIconos.POR_DEFECTO)
-        val pm = context.packageManager
-        val paquete = context.packageName
-
+    fun hayQueAplicar(contexto: Context, id: String): Boolean {
+        val pm = contexto.packageManager
+        val paquete = contexto.packageName
+        val elegido = numeroDe(id)
         for (numero in 1..TOTAL) {
             val comp = ComponentName(paquete, aliasDe(numero))
             val habilitado = estaHabilitado(pm, comp, porDefecto = numero == 1)
-            if (habilitado != (numero == elegido)) {
-                aplicar(context, if (numero == 1) "v1" else "v$numero")
-                return
-            }
+            if (habilitado != (numero == elegido)) return true
         }
+        return false
+    }
+
+    /**
+     * Si el teléfono es de Xiaomi (MIUI / HyperOS).
+     *
+     * Esos ROMs cierran la app y tiran un error cuando la app cambia sus
+     * componentes (los "alias" del ícono) con la app a la vista. Por eso
+     * ahí el cambio se aplica cuando el usuario sale de la app.
+     */
+    fun esXiaomi(): Boolean {
+        val marca = (Build.MANUFACTURER + " " + Build.BRAND).lowercase()
+        return marca.contains("xiaomi") || marca.contains("redmi") || marca.contains("poco")
+    }
+
+    /**
+     * Cambia el estado de un componente. `false` si el sistema lo bloqueó.
+     *
+     * Se traga la excepción a propósito: que un ROM no deje cambiar el ícono
+     * no puede ser motivo para que la app se caiga.
+     */
+    private fun cambiar(pm: PackageManager, componente: ComponentName, estado: Int): Boolean = try {
+        pm.setComponentEnabledSetting(componente, estado, PackageManager.DONT_KILL_APP)
+        true
+    } catch (e: Exception) {
+        false
     }
 
     /**
