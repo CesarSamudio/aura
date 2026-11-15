@@ -20,6 +20,9 @@ import java.time.ZoneId
  * El modelo, como lo corrigió Cesar:
  * - **META** ("sé el total"): la meta se reparte entre los que pagan, y el
  *   monto especial de uno **redistribuye**: los demás suben para llegar a la meta.
+ * - **META con cuota personalizada**: si Cesar pone una cuota a mano, ESA es
+ *   la que se cobra a cada uno y el total a cobrar sale de multiplicarla por
+ *   la gente. El costo real se conserva aparte.
  * - **LIBRE** ("cuánto paga cada uno"): el monto de cada uno es el que dijo
  *   Cesar; los montos especiales no cambian el de los demás, cambian el total.
  * - La lista de personas NO divide nada: es a quién se le cobra.
@@ -62,13 +65,15 @@ class LogicaDeudasTest {
         personasQuePagan: Int = 3,
         personas: List<PersonaDeuda> = listOf(persona("p1", "Cesar"), persona("p2", "Ana")),
         pagos: List<Pago> = emptyList(),
-        saldada: Boolean = false
+        saldada: Boolean = false,
+        cuotaPersonalizada: Double? = null
     ) = Deuda(
         id = id,
         nombre = nombre,
         modo = modo,
         total = total,
         montoPorPersona = montoPorPersona,
+        cuotaPersonalizada = cuotaPersonalizada,
         personasQuePagan = personasQuePagan,
         personas = personas,
         pagos = pagos,
@@ -149,6 +154,124 @@ class LogicaDeudasTest {
             personas = listOf(persona("p1", "Ana", 5.0), persona("p2", "Luis", 5.0))
         )
         assertEquals(0.0, CalculosDeudas.montoBaseDe(d), centavo)
+    }
+
+    // ------------------------------------------------------------------
+    // Cuota personalizada: cuando César NO quiere que se divida el costo
+    // ------------------------------------------------------------------
+
+    @Test
+    fun `la cuota personalizada manda sobre la division`() {
+        // El caso de Cesar: el costo de 42.80 entre 23 da 1.86, pero él cobra
+        // 1.90 a cada uno. Con cuota personalizada, la que manda es esa.
+        val d = deuda(
+            modo = ModoDeuda.META,
+            total = 42.80,
+            personasQuePagan = 23,
+            cuotaPersonalizada = 1.90
+        )
+        assertEquals(1.90, CalculosDeudas.montoBaseDe(d), centavo)
+        // Y la cuota es la que le toca a cada persona de la lista.
+        assertEquals(1.90, CalculosDeudas.cuotaDe(d, d.personas[0]), centavo)
+    }
+
+    @Test
+    fun `el total a cobrar sale de multiplicar la cuota por la gente`() {
+        val d = deuda(
+            modo = ModoDeuda.META,
+            total = 42.80,
+            personasQuePagan = 23,
+            cuotaPersonalizada = 1.90
+        )
+        // 23 × 1.90 = 43.70
+        assertEquals(43.70, CalculosDeudas.totalDe(d), centavo)
+        // El costo real NO se borra: sigue guardado en la deuda.
+        assertEquals(42.80, d.total, centavo)
+    }
+
+    @Test
+    fun `sin cuota personalizada no cambia nada de lo de siempre`() {
+        // Mismo caso, sin cuota: el total se divide como siempre.
+        val d = deuda(
+            modo = ModoDeuda.META,
+            total = 42.80,
+            personasQuePagan = 23
+        )
+        assertEquals(1.86, CalculosDeudas.montoBaseDe(d), centavo)
+        assertEquals(42.80, CalculosDeudas.totalDe(d), centavo)
+    }
+
+    @Test
+    fun `con cuota personalizada los montos especiales no reparten`() {
+        // Ana paga 5 de especial: con cuota fija, los demás siguen pagando
+        // 1.90 (lo que cambia es el total, no lo que pagan los demás).
+        val d = deuda(
+            modo = ModoDeuda.META,
+            total = 42.80,
+            personasQuePagan = 4,
+            personas = listOf(
+                persona("p1", "Ana", 5.0),
+                persona("p2", "Luis"),
+                persona("p3", "Carlos"),
+                persona("p4", "Sofía")
+            ),
+            cuotaPersonalizada = 1.90
+        )
+        assertEquals(1.90, CalculosDeudas.montoBaseDe(d), centavo)
+        assertEquals(5.0, CalculosDeudas.cuotaDe(d, d.personas[0]), centavo)
+        assertEquals(1.90, CalculosDeudas.cuotaDe(d, d.personas[1]), centavo)
+        // 1.90 × 4 + (5.00 − 1.90) = 10.70
+        assertEquals(10.70, CalculosDeudas.totalDe(d), centavo)
+    }
+
+    @Test
+    fun `el caso completo de cesar con cuota personalizada si cuadra`() {
+        // 23 personas, cuota de 1.90: 19 pagaron los 1.90 completos y 4
+        // pagaron 1.20 (parcial). Con la cuota a mano, la lista y el saldo
+        // dan el mismo número: 4 × 0.70 = 2.80.
+        val lista = List(23) { i -> persona("p${i + 1}", "Persona ${i + 1}") }
+        val pagos = List(23) { i ->
+            val numero = i + 1
+            pago("pg$numero", "p$numero", if (numero <= 19) 1.90 else 1.20)
+        }
+        val d = deuda(
+            modo = ModoDeuda.META,
+            total = 42.80,
+            personasQuePagan = 23,
+            personas = lista,
+            pagos = pagos,
+            cuotaPersonalizada = 1.90
+        )
+
+        val resumen = CalculosDeudas.resumen(d)
+        val personas = CalculosDeudas.personas(d)
+        val las19 = personas.filter { it.persona.id in (1..19).map { n -> "p$n" } }
+        val las4 = personas.filter { it.persona.id in (20..23).map { n -> "p$n" } }
+
+        // El total a cobrar es 43.70 (23 × 1.90), no el costo de 42.80.
+        assertEquals(43.70, resumen.total, centavo)
+        assertEquals(40.90, resumen.totalPagado, centavo)
+        // El saldo: 43.70 − 40.90 = 2.80
+        assertEquals(2.80, resumen.saldo, centavo)
+
+        // Las 19 que pagaron los 1.90: cuadradas exactas.
+        assertEquals(19, las19.size)
+        las19.forEach {
+            assertEquals("pendiente de ${it.persona.id}", 0.0, it.pendiente, centavo)
+            assertEquals("excedente de ${it.persona.id}", 0.0, it.excedente, centavo)
+        }
+
+        // Las 4 que pagaron 1.20: deben 1.90 − 1.20 = 0.70 cada una.
+        assertEquals(4, las4.size)
+        las4.forEach {
+            assertEquals("pendiente de ${it.persona.id}", 0.70, it.pendiente, centavo)
+            assertEquals("excedente de ${it.persona.id}", 0.0, it.excedente, centavo)
+        }
+
+        // Y lo importante: la lista y el saldo son el MISMO número.
+        val sumaPendientes = personas.sumOf { it.pendiente }
+        assertEquals(2.80, sumaPendientes, centavo)
+        assertEquals(resumen.saldo, sumaPendientes, centavo)
     }
 
     // ------------------------------------------------------------------

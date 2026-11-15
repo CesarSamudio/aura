@@ -38,8 +38,10 @@ import androidx.core.content.FileProvider
 import androidx.core.content.pm.PackageInfoCompat
 import com.cesar.ahorros.R
 import com.cesar.ahorros.data.AppViewModel
+import com.cesar.ahorros.data.CatalogoIconos
 import com.cesar.ahorros.data.CopiaLocal
 import com.cesar.ahorros.data.Deuda
+import com.cesar.ahorros.data.IconosApp
 import com.cesar.ahorros.data.MetodoPago
 import com.cesar.ahorros.data.ModoDeuda
 import com.cesar.ahorros.data.Movimiento
@@ -118,6 +120,12 @@ fun App() {
 
     // Los ajustes que la app recuerda entre sesiones (por ahora, el tema).
     val preferencias = remember(contexto) { Preferencias(contexto) }
+
+    // El ícono elegido: se guarda en los ajustes y se aplica habilitando el
+    // alias del logo (es lo único que el sistema permite para cambiarlo).
+    var iconoActualId by rememberSaveable {
+        mutableStateOf(preferencias.iconoId() ?: CatalogoIconos.POR_DEFECTO)
+    }
 
     /** "1.7 (8)" — la versión de la app, para la pantalla de ajustes. */
     val versionApp = remember {
@@ -271,6 +279,12 @@ fun App() {
                         if (TemaActual.aplicar(id)) {
                             preferencias.guardarTema(id)
                         }
+                    },
+                    iconoActualId = iconoActualId,
+                    onCambiarIcono = { id ->
+                        iconoActualId = id
+                        preferencias.guardarIcono(id)
+                        IconosApp.aplicar(contexto, id)
                     },
                     onVolver = { mostrarAjustes = false },
                     onExportar = {
@@ -426,9 +440,12 @@ fun App() {
     dialogoDeuda?.let { abierto ->
         DialogoDeuda(
             inicial = abierto.deuda,
-            onGuardar = { nombre, modo, total, montoPorPersona, personasQuePagan ->
+            onGuardar = { nombre, modo, total, montoPorPersona, personasQuePagan, cuotaPersonalizada ->
                 val ahora = LocalDateTime.now().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
                 val existente = abierto.deuda
+                // La cuota a mano solo tiene sentido en modo META: en modo
+                // libre el monto por persona ya es la cuota fija.
+                val cuota = if (modo == ModoDeuda.META) cuotaPersonalizada else null
                 if (existente == null) {
                     vm.agregarDeuda(
                         Deuda(
@@ -442,6 +459,7 @@ fun App() {
                             personas = emptyList(),
                             pagos = emptyList(),
                             saldada = false,
+                            cuotaPersonalizada = cuota,
                             ts = ahora
                         )
                     )
@@ -454,7 +472,8 @@ fun App() {
                             modo = modo,
                             total = if (modo == ModoDeuda.META) total else 0.0,
                             montoPorPersona = if (modo == ModoDeuda.LIBRE) montoPorPersona else 0.0,
-                            personasQuePagan = personasQuePagan
+                            personasQuePagan = personasQuePagan,
+                            cuotaPersonalizada = cuota
                         )
                     )
                 }

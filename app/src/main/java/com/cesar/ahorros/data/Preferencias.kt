@@ -9,10 +9,10 @@ import java.io.File
 /**
  * Los ajustes que la app recuerda entre sesiones.
  *
- * Por ahora hay uno solo: **el tema elegido**. Se guarda en un archivo JSON
- * dentro del almacenamiento interno (como los movimientos y las deudas), así
- * que entra también en la copia de seguridad: si respaldás y restaurás, el
- * tema vuelve con los datos.
+ * Por ahora hay dos: **el tema elegido** y **el ícono de la app**. Se guardan
+ * en un archivo JSON dentro del almacenamiento interno (como los movimientos y
+ * las deudas), así que entra también en la copia de seguridad: si respaldás y
+ * restaurás, el tema y el ícono vuelven con los datos.
  *
  * Sin base de datos, sin SharedPreferences y sin permisos: es un archivo de
  * una línea dentro de la carpeta de la app.
@@ -33,9 +33,17 @@ class Preferencias(private val carpeta: File) {
     /** El id del tema elegido; `null` si todavía no se eligió ninguno. */
     fun temaId(): String? = leer()?.tema
 
-    /** Guarda el tema elegido. */
+    /** El id del ícono elegido; `null` si todavía no se eligió ninguno. */
+    fun iconoId(): String? = leer()?.icono
+
+    /** Guarda el tema elegido (el ícono se queda como está). */
     fun guardarTema(id: String) {
-        escribir(AjustesLocales(tema = id))
+        escribir((leer() ?: AjustesLocales()).copy(tema = id))
+    }
+
+    /** Guarda el ícono elegido (el tema se queda como está). */
+    fun guardarIcono(id: String) {
+        escribir((leer() ?: AjustesLocales()).copy(icono = id))
     }
 
     private fun leer(): AjustesLocales? = try {
@@ -76,5 +84,7 @@ class Preferencias(private val carpeta: File) {
 @Serializable
 data class AjustesLocales(
     /** Id del tema elegido (ver `CatalogoTemas`). */
-    val tema: String? = null
+    val tema: String? = null,
+    /** Id del ícono de la app elegido (ver `CatalogoIconos`). */
+    val icono: String? = null
 )

@@ -77,13 +77,15 @@ class PersistenciaDeudasTest {
         personasQuePagan: Int = 3,
         personas: List<PersonaDeuda> = listOf(persona("p1", "Cesar"), persona("p2", "Ana")),
         pagos: List<Pago> = emptyList(),
-        saldada: Boolean = false
+        saldada: Boolean = false,
+        cuotaPersonalizada: Double? = null
     ) = Deuda(
         id = id,
         nombre = nombre,
         modo = modo,
         total = total,
         montoPorPersona = montoPorPersona,
+        cuotaPersonalizada = cuotaPersonalizada,
         personasQuePagan = personasQuePagan,
         personas = personas,
         pagos = pagos,
@@ -351,5 +353,58 @@ class PersistenciaDeudasTest {
         assertEquals(1, cargados.size)
         assertEquals("d3", cargados[0].id)
         assertFalse(archivoDeudas().readText().contains("d1"))
+    }
+
+    @Test
+    fun `la cuota personalizada se guarda y vuelve del json`() {
+        // La cuota que cobra Cesar a cada uno (la que no sale de dividir).
+        val lista = listOf(
+            deuda(
+                "d1", "banner del salon", ModoDeuda.META, 42.80,
+                personasQuePagan = 23, cuotaPersonalizada = 1.90
+            ),
+            // Esta no la tiene: viene en null.
+            deuda("d2", "pintura", ModoDeuda.META, 12.0, personasQuePagan = 3)
+        )
+
+        repositorio.guardar(lista)
+
+        val cargados = repositorio.cargar()
+        assertEquals(2, cargados.size)
+        assertEquals(1.90, cargados[0].cuotaPersonalizada!!, 0.0001)
+        // El costo real sigue guardado aparte.
+        assertEquals(42.80, cargados[0].total, 0.0001)
+        assertNull(cargados[1].cuotaPersonalizada)
+    }
+
+    @Test
+    fun `las deudas viejas sin cuota personalizada se cargan con null`() {
+        // El archivo viejo no tiene el campo: tiene que cargar sin problema
+        // y quedar como si nunca se hubiera puesto una cuota.
+        archivoDeudas().writeText(
+            """
+            [
+              {
+                "id": "d1",
+                "nombre": "banner",
+                "modo": "META",
+                "total": 42.80,
+                "montoPorPersona": 0.0,
+                "personasQuePagan": 23,
+                "personas": [{"id": "p1", "nombre": "Cesar"}],
+                "pagos": [],
+                "saldada": false,
+                "ts": 1700000000000
+              }
+            ]
+            """.trimIndent()
+        )
+
+        val cargados = repositorio.cargar()
+
+        assertEquals(1, cargados.size)
+        assertNull(cargados[0].cuotaPersonalizada)
+        assertEquals(42.80, cargados[0].total, 0.0001)
+        assertEquals(23, cargados[0].personasQuePagan)
     }
 }

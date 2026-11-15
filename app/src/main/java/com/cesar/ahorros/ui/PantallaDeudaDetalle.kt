@@ -70,6 +70,9 @@ import java.time.LocalDate
  *   (meta − montos especiales) ÷ (personas que pagan − los de monto
  *   especial): el monto especial **redistribuye** y los demás suben un poco
  *   para llegar a la meta.
+ * - En modo [ModoDeuda.META] con **cuota personalizada**, la cuota es la que
+ *   puso César (no se divide el costo) y el total a cobrar sale de
+ *   multiplicarla por la gente: los montos especiales ya no reparten.
  * - En modo [ModoDeuda.LIBRE] (César sabe cuánto cobra a cada uno), el monto
  *   de cada uno no se redistribuye: lo que cambia es el total.
  *
@@ -243,8 +246,15 @@ fun PantallaDeudaDetalle(
                         valor = montoBase.dineroSimbolo(),
                         colorValor = AcentoCalido,
                         pie = if (deuda.modo == ModoDeuda.META) {
-                            "total ÷ ${deuda.personasQuePagan} " +
-                                (if (deuda.personasQuePagan == 1) "persona" else "personas")
+                            if (deuda.cuotaPersonalizada != null) {
+                                // Con cuota a mano no se divide: el total a
+                                // cobrar sale de multiplicarla por la gente.
+                                "cuota fija · total a cobrar " +
+                                    CalculosDeudas.totalDe(deuda).dineroSimbolo()
+                            } else {
+                                "total ÷ ${deuda.personasQuePagan} " +
+                                    (if (deuda.personasQuePagan == 1) "persona" else "personas")
+                            }
                         } else {
                             "monto fijo"
                         },

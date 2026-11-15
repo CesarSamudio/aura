@@ -3,6 +3,7 @@ package com.cesar.ahorros.ui
 import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -43,20 +44,26 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.cesar.ahorros.data.CatalogoIconos
+import com.cesar.ahorros.data.IconoApp
 
 /**
  * La pantalla de **Ajustes**.
  *
- * Tres secciones, en este orden:
+ * Cuatro secciones, en este orden:
  *  1. **Apariencia**: el selector de temas. Cada tema se ve con una
  *     mini-vista previa de cómo queda (fondo, texto y botón con su acento)
  *     y se aplica al instante, sin reiniciar la app.
- *  2. **Copia de seguridad**: el `.zip` que el usuario guarda donde él quiera
+ *  2. **Icono de la app**: los 4 logos con los que se puede abrir Aura en la
+ *     pantalla del teléfono. El que se elige es el que se ve en el launcher.
+ *  3. **Copia de seguridad**: el `.zip` que el usuario guarda donde él quiera
  *     (Drive, WhatsApp, correo...) y que puede volver a meter cuando la
  *     necesite.
- *  3. **Acerca de**: la app, su versión y dónde viven los datos.
+ *  4. **Acerca de**: la app, su versión y dónde viven los datos.
  *
  * No hay nube ni cuentas: la app no tiene ningún permiso y no habla con
  * nadie.
@@ -67,6 +74,8 @@ fun PantallaAjustes(
     temas: List<TemaVisual>,
     temaActualId: String,
     onCambiarTema: (String) -> Unit,
+    iconoActualId: String,
+    onCambiarIcono: (String) -> Unit,
     onVolver: () -> Unit,
     onExportar: () -> Unit,
     onRestaurar: (Uri) -> Unit,
@@ -142,7 +151,32 @@ fun PantallaAjustes(
         Spacer(Modifier.height(18.dp))
 
         // ------------------------------------------------------------------
-        // 2. Copia de seguridad
+        // 2. Icono de la app
+        // ------------------------------------------------------------------
+        TituloSeccion("Icono de la app")
+
+        Text(
+            text = "Elegí con qué logo aparece Aura en la pantalla de tu teléfono. " +
+                "Algunos launchers tardan un par de segundos en cambiarlo.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = TextoSecundario
+        )
+
+        Spacer(Modifier.height(12.dp))
+
+        CatalogoIconos.lista.forEachIndexed { indice, icono ->
+            if (indice > 0) Spacer(Modifier.height(8.dp))
+            FilaIcono(
+                icono = icono,
+                esActual = icono.id == iconoActualId,
+                onClick = { onCambiarIcono(icono.id) }
+            )
+        }
+
+        Spacer(Modifier.height(18.dp))
+
+        // ------------------------------------------------------------------
+        // 3. Copia de seguridad
         // ------------------------------------------------------------------
         TituloSeccion("Copia de seguridad")
 
@@ -218,7 +252,7 @@ fun PantallaAjustes(
         }
 
         // ------------------------------------------------------------------
-        // 3. Acerca de (aquí viven también los datos de la app)
+        // 4. Acerca de (aquí viven también los datos de la app)
         // ------------------------------------------------------------------
         Spacer(Modifier.height(18.dp))
         TituloSeccion("Acerca de")
@@ -336,6 +370,68 @@ private fun FilaTema(
                 Icon(
                     imageVector = Icons.Filled.Check,
                     contentDescription = "Tema activo",
+                    tint = AcentoCalido,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Una fila del selector de íconos: el logo (tal cual se ve en el launcher),
+ * el nombre, la descripción y el check del que está puesto.
+ */
+@Composable
+private fun FilaIcono(
+    icono: IconoApp,
+    esActual: Boolean,
+    onClick: () -> Unit
+) {
+    val forma = RoundedCornerShape(RadioBoton)
+    Surface(
+        color = if (esActual) SuperficieAlta else Superficie,
+        shape = forma,
+        border = BorderStroke(
+            width = if (esActual) 1.5.dp else 1.dp,
+            color = if (esActual) AcentoCalido else Borde
+        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(forma)
+            .clickable(onClick = onClick)
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Image(
+                painter = painterResource(icono.recurso),
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .size(52.dp)
+                    .clip(RoundedCornerShape(14.dp))
+            )
+            Spacer(Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = icono.nombre,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = TextoPrimario
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = icono.descripcion,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextoSecundario
+                )
+            }
+            if (esActual) {
+                Spacer(Modifier.width(10.dp))
+                Icon(
+                    imageVector = Icons.Filled.Check,
+                    contentDescription = "Icono activo",
                     tint = AcentoCalido,
                     modifier = Modifier.size(22.dp)
                 )

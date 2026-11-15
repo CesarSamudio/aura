@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Icono adaptativo "%s" (%s).
+
+    Se genera con tools/generar-iconos-aura.py: el fondo, el dibujo y
+    la silueta tienen que salir de la MISMA fuente, o el icono se ve
+    partido entre versiones de Android.
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@drawable/ic_launcher_fondo_v4" />
+    <foreground android:drawable="@mipmap/ic_launcher_v4_fg" />
+    <monochrome android:drawable="@mipmap/ic_launcher_v4_mono" />
+</adaptive-icon>

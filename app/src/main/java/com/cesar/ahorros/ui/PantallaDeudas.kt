@@ -243,13 +243,19 @@ internal fun EtiquetaSaldadaDeuda() {
 /**
  * El total de la deuda, con la etiqueta que corresponde al modo.
  *
- * - META: es la meta (el costo de la cosa).
+ * - META: es la meta (el costo de la cosa). Si hay cuota personalizada, el
+ *   costo y lo que se cobra son dos cosas distintas: se muestran las dos,
+ *   porque el costo no se borra.
  * - LIBRE: es lo que sale de sumar (César no lo puso, la app lo calculó).
  */
 internal fun textoTotalDeuda(deuda: Deuda): String {
     val total = CalculosDeudas.totalDe(deuda).dineroSimbolo()
     return when (deuda.modo) {
-        ModoDeuda.META -> "Costo total: $total"
+        ModoDeuda.META -> if (deuda.cuotaPersonalizada != null) {
+            "Costo: ${deuda.total.dineroSimbolo()} · a cobrar: $total"
+        } else {
+            "Costo total: $total"
+        }
         ModoDeuda.LIBRE -> "Total a cobrar: $total"
     }
 }
@@ -258,6 +264,9 @@ internal fun textoTotalDeuda(deuda: Deuda): String {
  * La línea clave de la deuda, según el modo:
  * - META: "4 personas deben pagarlo · $15,00 cada uno"
  * - LIBRE: "4 personas · $4,00 cada uno · total $16,00"
+ *
+ * Con cuota personalizada (modo META) la cuota es la que puso César, así que
+ * la línea dice lo mismo de siempre: solo cambia de dónde sale el número.
  *
  * Si la deuda está marcada a mano como saldada, se le quita el "deben
  * pagarlo": la deuda está cerrada y no se contradice el estado verde.
@@ -293,7 +302,9 @@ internal fun textoRepartoDeuda(deuda: Deuda): String {
  * ninguno, para no meter texto de más.
  *
  * - META: el monto especial **redistribuye**: los que pagan la cuota normal
- *   suben para que entre todos se llegue a la meta.
+ *   suben para que entre todos se llegue a la meta. Salvo que haya cuota
+ *   personalizada: ahí la cuota es fija y el monto especial no toca a los
+ *   demás, cambia el total (como en modo LIBRE).
  * - LIBRE: el monto especial no cambia lo que pagan los demás; cambia el
  *   total.
  */
@@ -307,12 +318,19 @@ internal fun textoRedistribucion(deuda: Deuda): String? {
 
     return when (deuda.modo) {
         ModoDeuda.META -> {
-            val prefijo = if (propios.size == 1) {
-                "Con el monto especial de"
+            if (deuda.cuotaPersonalizada != null) {
+                // Con cuota fija no hay nada que repartir: el monto especial
+                // cambia el total, no lo que pagan los demás.
+                "Los montos especiales de $nombres no cambian lo que pagan los demás: " +
+                    "cambian el total ($total)."
             } else {
-                "Con los montos especiales de"
+                val prefijo = if (propios.size == 1) {
+                    "Con el monto especial de"
+                } else {
+                    "Con los montos especiales de"
+                }
+                "$prefijo $nombres, los demás pagan $base cada uno."
             }
-            "$prefijo $nombres, los demás pagan $base cada uno."
         }
         ModoDeuda.LIBRE ->
             "Los montos especiales de $nombres no cambian lo que pagan los demás: " +

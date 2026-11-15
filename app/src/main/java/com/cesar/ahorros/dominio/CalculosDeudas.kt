@@ -20,6 +20,13 @@ import java.time.LocalDate
  *   pagan (10 − 2) ÷ 2 = $4 cada uno. El monto especial **redistribuye**.
  * - [ModoDeuda.LIBRE]: se sabe cuánto cobra a cada uno. Los montos propios no
  *   cambian el monto de los demás: lo que cambia es el total, que se calcula.
+ *
+ * En modo META hay una tercera opción: la **cuota personalizada**. Cuando
+ * César pone una cuota a mano (por ejemplo, $1,90 en vez de los $1,86 que
+ * salen de dividir), ESA cuota es la que cobra cada uno y el total a cobrar
+ * sale de multiplicarla por la gente. El costo real se conserva aparte: no
+ * se borra, se muestra como dato aparte. Sin cuota personalizada (o sea, en
+ * `null`, que es lo normal) nada de esto cambia: se divide como siempre.
  */
 object CalculosDeudas {
 
@@ -39,12 +46,27 @@ object CalculosDeudas {
 
     /**
      * El total real de la deuda.
-     * - META: la meta que puso Cesar.
+     * - META: la meta que puso Cesar. Si hay cuota personalizada, el total que
+     *   se COBRA es la cuota × la gente (más el ajuste de los montos
+     *   especiales): el costo real queda guardado aparte, en la deuda.
      * - LIBRE: lo que se cobra sumando (base × gente, más o menos los casos
      *   especiales).
      */
     fun totalDe(deuda: Deuda): Double = when (deuda.modo) {
-        ModoDeuda.META -> redondear(deuda.total)
+        ModoDeuda.META -> {
+            val cuota = deuda.cuotaPersonalizada
+            if (cuota != null) {
+                // Con cuota fija el total a cobrar sale de multiplicar, igual
+                // que en modo libre: el costo real no se reparte.
+                val base = redondear(cuota)
+                val n = deuda.personasQuePagan
+                // Los que tienen monto propio pagan su monto en vez de la base.
+                val ajuste = sumaPropios(deuda) - base * cantidadPropios(deuda)
+                redondear(base * n + ajuste)
+            } else {
+                redondear(deuda.total)
+            }
+        }
         ModoDeuda.LIBRE -> {
             val base = redondear(deuda.montoPorPersona)
             val n = deuda.personasQuePagan
@@ -58,13 +80,20 @@ object CalculosDeudas {
      * Lo que paga cada uno por defecto (la "cuota normal").
      * - META: (meta − montos propios) ÷ (personas que pagan − las de monto
      *   propio). El monto especial redistribuye: los demás suben para llegar
-     *   a la meta.
+     *   a la meta. Si hay **cuota personalizada**, esa manda: es la que se
+     *   cobra a cada uno y el monto especial de uno NO redistribuye (igual
+     *   que en modo libre).
      * - LIBRE: el monto que puso Cesar, sin redistribuir.
      */
     fun montoBaseDe(deuda: Deuda): Double = when (deuda.modo) {
         ModoDeuda.META -> {
-            val restantes = deuda.personasQuePagan - cantidadPropios(deuda)
-            if (restantes <= 0) 0.0 else redondear((deuda.total - sumaPropios(deuda)) / restantes)
+            val cuota = deuda.cuotaPersonalizada
+            if (cuota != null) {
+                redondear(cuota)
+            } else {
+                val restantes = deuda.personasQuePagan - cantidadPropios(deuda)
+                if (restantes <= 0) 0.0 else redondear((deuda.total - sumaPropios(deuda)) / restantes)
+            }
         }
         ModoDeuda.LIBRE -> redondear(deuda.montoPorPersona)
     }
@@ -169,7 +198,10 @@ data class ResumenPersona(
 
 /** Cómo va la deuda completa. */
 data class ResumenDeuda(
-    /** El total real de la deuda (la meta o lo que sale de sumar). */
+    /**
+     * El total de la deuda: la meta, o lo que sale de sumar. Con cuota
+     * personalizada es el total A COBRAR (la cuota × la gente).
+     */
     val total: Double,
     /** Lo que paga cada uno por defecto (la cuota normal). */
     val montoBase: Double,
@@ -178,7 +210,11 @@ data class ResumenDeuda(
     val personasDeben: Int,
     /** Cuántas personas hay en la lista. */
     val personasEnLista: Int,
-    /** Cuánto falta por cobrar en total (el dinero, no la lista). */
+    /**
+     * Cuánto falta por cobrar en total (el dinero, no la lista). Se mide
+     * contra el total a cobrar: por eso, con cuota personalizada, el saldo y
+     * la suma de lo que deben los de la lista dan el mismo número.
+     */
     val saldo: Double
 ) {
     val estaSaldada: Boolean get() = saldo <= 0.0

@@ -79,6 +79,11 @@ import java.io.File
  *   sí cuánto cobra a cada quien. Se pone el monto y el total sale de
  *   multiplicar.
  *
+ * En modo META hay un campo extra opcional: la **cuota que vas a cobrar**.
+ * Es para cuando César no quiere que el costo se divida (si divide $42,80
+ * entre 23 y sale $1,86, pero él cobra $1,90). Si el campo queda vacío, la
+ * cuota sale de dividir como siempre: no cambia nada.
+ *
  * La lista de personas NO entra en cuenta aquí: es a quién se le cobra, no
  * quién divide. Si alguien tiene un monto propio ("caso especial"), eso se
  * ajusta persona por persona desde el detalle de la deuda.
@@ -86,7 +91,14 @@ import java.io.File
 @Composable
 fun DialogoDeuda(
     inicial: Deuda?,
-    onGuardar: (nombre: String, modo: ModoDeuda, total: Double, montoPorPersona: Double, personasQuePagan: Int) -> Unit,
+    onGuardar: (
+        nombre: String,
+        modo: ModoDeuda,
+        total: Double,
+        montoPorPersona: Double,
+        personasQuePagan: Int,
+        cuotaPersonalizada: Double?
+    ) -> Unit,
     onCerrar: () -> Unit
 ) {
     var modo by remember { mutableStateOf(inicial?.modo ?: ModoDeuda.META) }
@@ -118,6 +130,11 @@ fun DialogoDeuda(
     var personasTexto by remember {
         mutableStateOf(inicial?.personasQuePagan?.coerceAtLeast(1)?.toString() ?: "")
     }
+    // La cuota a mano (solo en modo META): vacía = se divide el costo como
+    // siempre. Si la deuda ya la tenía, el campo arranca con ese valor.
+    var cuotaTexto by remember {
+        mutableStateOf(inicial?.cuotaPersonalizada?.let { montoEnTexto(it) } ?: "")
+    }
 
     val total = totalTexto.replace(",", ".").toDoubleOrNull()
     val totalValido = total != null && total > 0.0
@@ -125,9 +142,13 @@ fun DialogoDeuda(
     val montoValido = monto != null && monto > 0.0
     val personas = personasTexto.trim().toIntOrNull()
     val personasValido = personas != null && personas >= 1
+    // Vacía es válido (se divide el costo); si tiene algo, tiene que ser un
+    // número mayor que cero.
+    val cuota = cuotaTexto.replace(",", ".").toDoubleOrNull()
+    val cuotaValido = cuotaTexto.isEmpty() || (cuota != null && cuota > 0.0)
 
     val valido = nombre.isNotBlank() && personasValido && when (modo) {
-        ModoDeuda.META -> totalValido
+        ModoDeuda.META -> totalValido && cuotaValido
         ModoDeuda.LIBRE -> montoValido
     }
 
@@ -138,21 +159,28 @@ fun DialogoDeuda(
         modo = modo,
         total = if (modo == ModoDeuda.META) (total ?: 0.0) else 0.0,
         montoPorPersona = if (modo == ModoDeuda.LIBRE) (monto ?: 0.0) else 0.0,
-        personasQuePagan = personas ?: 0
+        personasQuePagan = personas ?: 0,
+        // Con cuota a mano, esa manda: los montos especiales no reparten.
+        cuotaPersonalizada = if (modo == ModoDeuda.META) cuota else null
     )
 
     // La vista en vivo: lo que se cobra o lo que se paga, según el modo.
-    val cuotaPrevia = if (modo == ModoDeuda.META && totalValido && personasValido) {
+    val cuotaPrevia = if (modo == ModoDeuda.META && personasValido && (totalValido || cuota != null)) {
         simulada?.let { CalculosDeudas.montoBaseDe(it) }
+            ?: cuota?.let { CalculosDeudas.redondear(it) }
             ?: CalculosDeudas.redondear(total!! / personas!!)
     } else {
         null
     }
-    val totalPrevio = if (modo == ModoDeuda.LIBRE && montoValido && personasValido) {
-        simulada?.let { CalculosDeudas.totalDe(it) }
-            ?: CalculosDeudas.redondear(monto!! * personas!!)
-    } else {
-        null
+    val totalPrevio = when {
+        modo == ModoDeuda.LIBRE && montoValido && personasValido ->
+            simulada?.let { CalculosDeudas.totalDe(it) }
+                ?: CalculosDeudas.redondear(monto!! * personas!!)
+        // Con cuota a mano, el total a cobrar sale de multiplicar.
+        modo == ModoDeuda.META && cuota != null && personasValido ->
+            simulada?.let { CalculosDeudas.totalDe(it) }
+                ?: CalculosDeudas.redondear(cuota * personas!!)
+        else -> null
     }
 
     AlertDialog(
@@ -226,6 +254,32 @@ fun DialogoDeuda(
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.fillMaxWidth()
                     )
+                    Spacer(Modifier.height(12.dp))
+                    // La cuota a mano: es para cuando Cesar no quiere que el
+                    // costo se divida. Vacía = se divide como siempre.
+                    OutlinedTextField(
+                        value = cuotaTexto,
+                        onValueChange = { entrada ->
+                            if (entrada.isEmpty() || entrada.all { it.isDigit() || it == '.' || it == ',' }) {
+                                cuotaTexto = entrada
+                            }
+                        },
+                        label = { Text("Cuota que vas a cobrar") },
+                        placeholder = { Text("Ejemplo: 1.90") },
+                        prefix = { Text("$") },
+                        singleLine = true,
+                        isError = cuotaTexto.isNotEmpty() && !cuotaValido,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "Opcional. Si la pones, cobra esa cantidad a cada uno y el " +
+                            "total a cobrar sale de multiplicarla por la gente. Si la dejas " +
+                            "vacía, se divide el costo total.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextoSecundario
+                    )
                 } else {
                     OutlinedTextField(
                         value = montoTexto,
@@ -281,8 +335,15 @@ fun DialogoDeuda(
                         Text(
                             text = if (personasValido) {
                                 when (modo) {
-                                    ModoDeuda.META -> "El total se divide entre $personas " +
-                                        (if (personas == 1) "persona" else "personas") + "."
+                                    ModoDeuda.META -> if (cuota != null) {
+                                        // Con cuota a mano el total a cobrar sale
+                                        // de multiplicar, no de dividir.
+                                        "Total a cobrar: " +
+                                            (totalPrevio?.dineroSimbolo() ?: "—")
+                                    } else {
+                                        "El costo total se divide entre $personas " +
+                                            (if (personas == 1) "persona" else "personas") + "."
+                                    }
                                     ModoDeuda.LIBRE -> "$personas " +
                                         (if (personas == 1) "persona paga" else "personas pagan") +
                                         " ${monto?.dineroSimbolo() ?: "—"} cada uno."
@@ -293,6 +354,18 @@ fun DialogoDeuda(
                             style = MaterialTheme.typography.labelSmall,
                             color = TextoSecundario
                         )
+
+                        // Con cuota a mano, el costo real no se borra: se
+                        // muestra aparte para que César lo vea.
+                        if (modo == ModoDeuda.META && cuota != null && totalValido) {
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = "Costo real: ${total?.dineroSimbolo() ?: "—"} " +
+                                    "(queda guardado aparte).",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextoSecundario
+                            )
+                        }
 
                         // Si ya hay montos especiales, se avisa de que cambian
                         // el monto de los demás (o el total, en modo libre).
@@ -316,21 +389,35 @@ fun DialogoDeuda(
                 Spacer(Modifier.height(12.dp))
                 if (inicial == null) {
                     Text(
-                        text = "Después de crear la deuda agregas a las personas que van " +
-                            "a pagar. La lista NO divide: la cuota la define el número de " +
-                            "personas que la pagan.",
+                        text = if (modo == ModoDeuda.META && cuota != null) {
+                            "Después de crear la deuda agregas a las personas que van " +
+                                "a pagar. La lista NO divide: cada una paga la cuota que pusiste."
+                        } else {
+                            "Después de crear la deuda agregas a las personas que van " +
+                                "a pagar. La lista NO divide: la cuota la define el número de " +
+                                "personas que la pagan."
+                        },
                         style = MaterialTheme.typography.labelSmall,
                         color = TextoSecundario
                     )
                 } else {
                     Text(
                         text = when (modo) {
-                            ModoDeuda.META ->
+                            ModoDeuda.META -> if (cuota != null) {
+                                // Con cuota a mano no hay nada que repartir: el
+                                // monto especial cambia el total, no la cuota.
+                                "En la lista hay ${inicial.personas.size} " +
+                                    (if (inicial.personas.size == 1) "persona" else "personas") +
+                                    ". La cuota no cambia si agregas o quitas gente: es la que " +
+                                    "pusiste. Si alguien tiene un monto especial, no cambia lo " +
+                                    "que pagan los demás: cambia el total."
+                            } else {
                                 "En la lista hay ${inicial.personas.size} " +
                                     (if (inicial.personas.size == 1) "persona" else "personas") +
                                     ". La cuota no cambia si agregas o quitas gente: la define " +
                                     "el número de personas que la pagan. Si alguien tiene un " +
                                     "monto especial, los demás se reparten lo que queda."
+                            }
                             ModoDeuda.LIBRE ->
                                 "En la lista hay ${inicial.personas.size} " +
                                     (if (inicial.personas.size == 1) "persona" else "personas") +
@@ -352,7 +439,10 @@ fun DialogoDeuda(
                         modo,
                         if (modo == ModoDeuda.META) total!! else 0.0,
                         if (modo == ModoDeuda.LIBRE) monto!! else 0.0,
-                        personas!!
+                        personas!!,
+                        // La cuota a mano solo existe en modo META: en modo
+                        // libre el monto por persona ya es la cuota fija.
+                        if (modo == ModoDeuda.META) cuota else null
                     )
                 }
             ) {

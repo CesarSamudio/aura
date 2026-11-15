@@ -102,6 +102,9 @@ data class Pago(
  *   calcula y este valor no se usa.
  * - [montoPorPersona]: lo que paga cada uno por defecto, cuando el modo es
  *   [ModoDeuda.LIBRE]. En modo META se calcula y este valor no se usa.
+ * - [cuotaPersonalizada]: la cuota fija que Cesar cobra a cada uno, cuando no
+ *   quiere que el costo se divida. Es opcional: si no está, la cuota sale
+ *   de dividir como siempre.
  */
 @Serializable
 data class Deuda(
@@ -110,6 +113,14 @@ data class Deuda(
     val modo: ModoDeuda = ModoDeuda.META,
     val total: Double = 0.0,
     val montoPorPersona: Double = 0.0,
+    /**
+     * La cuota que César cobra a cada uno cuando no quiere dividir el total.
+     *
+     * Si es `null` (lo normal), la cuota sale de dividir el total: el
+     * comportamiento de siempre. Si tiene valor, ESA cuota manda y el total a
+     * cobrar sale de multiplicarla por la gente, no de dividir el costo.
+     */
+    val cuotaPersonalizada: Double? = null,
     /**
      * Cuántas personas tienen que pagar este total. De ahí sale la cuota.
      *

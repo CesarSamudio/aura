@@ -9,21 +9,23 @@
 
     <application
         android:allowBackup="true"
-        android:icon="@mipmap/ic_launcher"
-        android:roundIcon="@mipmap/ic_launcher_round"
+        android:icon="@mipmap/ic_launcher_v1"
+        android:roundIcon="@mipmap/ic_launcher_v1_round"
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.Ahorros">
 
+        <!--
+          La actividad principal NO es la que aparece en el launcher: eso lo
+          hacen los 4 "alias" de abajo, para que se pueda cambiar el ícono de
+          la app desde Ajustes. La actividad se abre igual (los alias apuntan
+          a ella).
+        -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode"
             android:theme="@style/Theme.Ahorros">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
         </activity>
 
         <!--
@@ -40,6 +42,68 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <!--
+          Los 4 íconos de la app. De entrada solo el primero está habilitado:
+          por eso el launcher muestra UN ícono y no cuatro. Cuando el usuario
+          elige otro en Ajustes, la app habilita ese alias y deshabilita los
+          demás (ver `IconosApp`).
+
+          El nombre lleva `${applicationId}` porque las dos variantes de la
+          app (general y 11G) tienen paquete distinto: el alias tiene que
+          existir con el nombre del paquete con el que se instaló.
+        -->
+        <activity-alias
+            android:name="${applicationId}.AliasIcono1"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_v1"
+            android:roundIcon="@mipmap/ic_launcher_v1_round"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name="${applicationId}.AliasIcono2"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_v2"
+            android:roundIcon="@mipmap/ic_launcher_v2_round"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name="${applicationId}.AliasIcono3"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_v3"
+            android:roundIcon="@mipmap/ic_launcher_v3_round"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name="${applicationId}.AliasIcono4"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_v4"
+            android:roundIcon="@mipmap/ic_launcher_v4_round"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
     </application>
 
 </manifest>

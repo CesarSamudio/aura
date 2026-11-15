@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
+import com.cesar.ahorros.data.IconosApp
 import com.cesar.ahorros.data.Preferencias
 import com.cesar.ahorros.ui.App
 import com.cesar.ahorros.ui.TemaActual
@@ -19,9 +20,15 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
+        val preferencias = Preferencias(this)
+
         // El tema que eligió el usuario se aplica ANTES de pintar nada: así la
         // app no aparece con el tema viejo y cambia al nuevo delante de él.
-        TemaActual.aplicar(Preferencias(this).temaId())
+        TemaActual.aplicar(preferencias.temaId())
+
+        // El ícono del launcher: se deja como el usuario lo eligió. Esto solo
+        // hace falta si algo lo descolocó (una reinstalación, por ejemplo).
+        IconosApp.asegurar(this, preferencias.iconoId())
 
         // El fondo de la ventana sigue al tema: en los temas claros no debe
         // verse un destello negro mientras se abre la app.
