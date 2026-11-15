@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -84,8 +85,13 @@ fun PantallaAnadirPersonas(
     cuotaBase: Double,
     yaAgregadas: List<String>,
     listas: List<ListaDeGente>,
+    /** True si la lista que viene con la app fue borrada (se puede devolver). */
+    listaDelColegioBorrada: Boolean,
+    /** El nombre de la lista que viene con la app, si esta versión la tiene. */
+    nombreListaDelColegio: String?,
     onCrearLista: (String, List<String>) -> Unit,
     onEliminarLista: (String) -> Unit,
+    onRestaurarListaDelColegio: () -> Unit,
     onConfirmar: (List<PersonaPorAgregar>) -> Unit,
     onCancelar: () -> Unit
 ) {
@@ -222,6 +228,27 @@ fun PantallaAnadirPersonas(
         }
 
         Spacer(Modifier.height(12.dp))
+
+        // Si el usuario borró la lista que viene con la app (la del salón del
+        // 11G), sale el botón para devolverla.
+        if (listaDelColegioBorrada && nombreListaDelColegio != null) {
+            OutlinedButton(
+                onClick = onRestaurarListaDelColegio,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(RadioBoton),
+                border = BorderStroke(1.dp, Borde)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Refresh,
+                    contentDescription = null,
+                    tint = AcentoMenta,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("Devolver la lista \"$nombreListaDelColegio\"", color = AcentoMenta)
+            }
+            Spacer(Modifier.height(12.dp))
+        }
 
         if (listas.isEmpty()) {
             Surface(
@@ -455,8 +482,14 @@ fun PantallaAnadirPersonas(
         val lista = listas.firstOrNull { it.id == listaABorrar }
         DialogoConfirmarBorrar(
             texto = lista?.let {
-                "Se borra la lista \"${it.nombre}\" con sus ${it.personas.size} " +
-                    (if (it.personas.size == 1) "persona" else "personas") + "."
+                val personas = it.personas.size
+                val gente = if (personas == 1) "1 persona" else "$personas personas"
+                if (it.bloqueada) {
+                    "Se borra la lista \"${it.nombre}\" con sus $gente. " +
+                        "Podés volver a traerla después con el botón de abajo."
+                } else {
+                    "Se borra la lista \"${it.nombre}\" con sus $gente."
+                }
             } ?: "Se borra la lista.",
             onConfirmar = {
                 val id = listaABorrar
@@ -473,8 +506,11 @@ fun PantallaAnadirPersonas(
 }
 
 /**
- * Tarjeta de una lista de gente: se pliega y se despliega, y se puede borrar
- * (solo las que creó el usuario: las que vienen con la app están bloqueadas).
+ * Tarjeta de una lista de gente: se pliega y se despliega, y se puede borrar.
+ *
+ * Se pueden borrar todas, incluso la que viene con la app (la del salón del
+ * 11G): esa se anota en los ajustes para que no vuelva a salir sola, y se
+ * puede devolver desde la misma pantalla.
  */
 @Composable
 private fun TarjetaLista(
@@ -525,16 +561,15 @@ private fun TarjetaLista(
                     )
                 }
 
-                // La papelera solo aparece en las listas que creó el usuario.
-                if (!lista.bloqueada) {
-                    IconButton(onClick = onPedirBorrar, modifier = Modifier.size(40.dp)) {
-                        Icon(
-                            imageVector = Icons.Filled.Delete,
-                            contentDescription = "Eliminar lista",
-                            tint = ColorGasto,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
+                // La papelera sale en TODAS las listas, incluso en la que viene
+                // con la app (la del salón): esa se puede devolver después.
+                IconButton(onClick = onPedirBorrar, modifier = Modifier.size(40.dp)) {
+                    Icon(
+                        imageVector = Icons.Filled.Delete,
+                        contentDescription = "Eliminar lista",
+                        tint = ColorGasto,
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
 
                 Icon(

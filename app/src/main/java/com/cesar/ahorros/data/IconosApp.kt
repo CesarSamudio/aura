@@ -47,26 +47,26 @@ object CatalogoIconos {
     val lista: List<IconoApp> = listOf(
         IconoApp(
             id = "v1",
-            nombre = "Órbita",
-            descripcion = "Una moneda con su anillo",
+            nombre = "Aureola",
+            descripcion = "Una moneda con su aureola",
             recurso = R.mipmap.ic_previa_v1
         ),
         IconoApp(
             id = "v2",
-            nombre = "Chispa",
-            descripcion = "Un destello de cuatro puntas",
+            nombre = "Billete",
+            descripcion = "Un billete con el signo del peso",
             recurso = R.mipmap.ic_previa_v2
         ),
         IconoApp(
             id = "v3",
-            nombre = "Corona",
-            descripcion = "La corona de lo que ahorrás",
+            nombre = "Cascada",
+            descripcion = "Monedas cayendo en diagonal",
             recurso = R.mipmap.ic_previa_v3
         ),
         IconoApp(
             id = "v4",
-            nombre = "Creciente",
-            descripcion = "La luna con su planeta",
+            nombre = "Destello",
+            descripcion = "Una moneda con su destello",
             recurso = R.mipmap.ic_previa_v4
         )
     )

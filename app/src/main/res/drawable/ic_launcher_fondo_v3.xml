@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Fondo del icono "Corona" (v3).
+    Fondo del icono "Cascada" (v3).
 
     Se genera con tools/generar-iconos-aura.py: el degradado tiene que ser
     el MISMO que el del PNG del icono antiguo, o se ven distintos.
@@ -19,8 +19,8 @@
                 android:startY="-0.00"
                 android:endX="0.00"
                 android:endY="108.00">
-                <item android:offset="0" android:color="#064E3B" />
-                <item android:offset="1" android:color="#10B981" />
+                <item android:offset="0" android:color="#7C2D12" />
+                <item android:offset="1" android:color="#F59E0B" />
             </gradient>
         </aapt:attr>
     </path>

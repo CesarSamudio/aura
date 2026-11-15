@@ -67,4 +67,42 @@ class PreferenciasTest {
 
         assertEquals("trunk", Preferencias(carpeta.root).temaId())
     }
+
+    @Test
+    fun `guardar un ajuste no borra los otros`() {
+        // El tema, el ícono y las listas borradas viven en el MISMO archivo:
+        // guardar uno no puede borrar lo que ya estaba.
+        val preferencias = Preferencias(carpeta.root)
+        preferencias.guardarIcono("v3")
+        preferencias.guardarListaBorrada("salon11g")
+        preferencias.guardarTema("osmo")
+
+        val otra = Preferencias(carpeta.root)
+        assertEquals("osmo", otra.temaId())
+        assertEquals("v3", otra.iconoId())
+        assertEquals(listOf("salon11g"), otra.listasBorradas())
+    }
+
+    @Test
+    fun `una lista que viene con la app se puede borrar y devolver`() {
+        // La lista del salón no está en el archivo de listas: para que no
+        // vuelva a salir sola, se anota acá que el usuario la borró.
+        val preferencias = Preferencias(carpeta.root)
+        assertTrue(preferencias.listasBorradas().isEmpty())
+
+        preferencias.guardarListaBorrada("salon11g")
+        assertEquals(listOf("salon11g"), Preferencias(carpeta.root).listasBorradas())
+
+        preferencias.restaurarLista("salon11g")
+        assertTrue(Preferencias(carpeta.root).listasBorradas().isEmpty())
+    }
+
+    @Test
+    fun `borrar dos veces la misma lista no la duplica`() {
+        val preferencias = Preferencias(carpeta.root)
+        preferencias.guardarListaBorrada("salon11g")
+        preferencias.guardarListaBorrada("salon11g")
+
+        assertEquals(listOf("salon11g"), Preferencias(carpeta.root).listasBorradas())
+    }
 }

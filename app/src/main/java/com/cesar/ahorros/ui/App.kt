@@ -87,6 +87,7 @@ fun App() {
     val movimientos by vm.movimientos.collectAsStateWithLifecycle()
     val deudas by vm.deudas.collectAsStateWithLifecycle()
     val listas by vm.listas.collectAsStateWithLifecycle()
+    val listaDelColegioBorrada by vm.listaDelColegioBorrada.collectAsStateWithLifecycle()
 
     var pestana by rememberSaveable { mutableStateOf(Pestana.AHORROS) }
     var dialogo by remember { mutableStateOf<DialogoAbierto?>(null) }
@@ -345,10 +346,15 @@ fun App() {
                                 cuotaBase = CalculosDeudas.montoBaseDe(deuda),
                                 yaAgregadas = deuda.personas.map { it.nombre },
                                 listas = listas,
+                                listaDelColegioBorrada = listaDelColegioBorrada,
+                                nombreListaDelColegio = vm.nombreListaDelColegio,
                                 onCrearLista = { nombre, personas ->
                                     vm.crearLista(nombre, personas)
                                 },
                                 onEliminarLista = { id -> vm.eliminarLista(id) },
+                                onRestaurarListaDelColegio = {
+                                    vm.restaurarListaDelColegio()
+                                },
                                 onConfirmar = { nuevas ->
                                     nuevas.forEach { nueva ->
                                         vm.agregarPersona(

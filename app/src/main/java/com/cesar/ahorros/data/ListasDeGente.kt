@@ -18,8 +18,14 @@ data class ListaDeGente(
     /** Los nombres de la gente, en el orden en que se guardaron. */
     val personas: List<String>,
     /**
-     * Las listas que vienen con la app (la del 11G) **no se pueden borrar**:
-     * vienen con el código y se vuelven a poner cada vez que se abre la app.
+     * Las listas que vienen con la app (la del 11G) no se guardan en el
+     * archivo del usuario: se ponen solas cada vez que se abre la app.
+     *
+     * Ojo: eso NO significa que no se puedan borrar. Si el usuario borra una,
+     * queda anotada en los ajustes (`ajustes.json`) para que no vuelva a
+     * salir sola, y se puede devolver desde la pantalla de "Añadir personas".
+     * Lo que este dato marca es de dónde viene la lista, no si se puede
+     * borrar.
      */
     val bloqueada: Boolean = false
 )

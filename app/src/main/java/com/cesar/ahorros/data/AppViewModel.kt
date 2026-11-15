@@ -256,6 +256,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     // ------------------------------------------------------------------
 
     private val repositorioListas = RepositorioListas(application)
+    private val preferencias = Preferencias(application)
 
     /**
      * Las listas que hay: primero la que viene con la app (la del 11G, solo en
@@ -264,11 +265,31 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val _listas = MutableStateFlow(cargarListas())
     val listas: StateFlow<List<ListaDeGente>> = _listas.asStateFlow()
 
+    /**
+     * Si la lista que viene con la app está borrada: si lo está, la pantalla
+     * ofrece devolverla.
+     */
+    private val _listaDelColegioBorrada = MutableStateFlow(listaDelColegioEstaBorrada())
+    val listaDelColegioBorrada: StateFlow<Boolean> = _listaDelColegioBorrada.asStateFlow()
+
     private fun cargarListas(): List<ListaDeGente> {
         val guardadas = repositorioListas.cargar()
         val delColegio = ListaSalon.lista
-        return if (delColegio == null) guardadas else listOf(delColegio) + guardadas
+        return when {
+            delColegio == null -> guardadas
+            listaDelColegioEstaBorrada() -> guardadas
+            else -> listOf(delColegio) + guardadas
+        }
     }
+
+    /** Si el usuario borró la lista que viene con la app. */
+    private fun listaDelColegioEstaBorrada(): Boolean {
+        val delColegio = ListaSalon.lista ?: return false
+        return delColegio.id in preferencias.listasBorradas()
+    }
+
+    /** El nombre de la lista que viene con la app, si esta versión la tiene. */
+    val nombreListaDelColegio: String? get() = ListaSalon.lista?.nombre
 
     /**
      * Crea una lista nueva con la gente que se le pase.
@@ -296,10 +317,23 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         return true
     }
 
-    /** Borra una lista del usuario. Las que vienen con la app no se pueden borrar. */
+    /**
+     * Borra una lista.
+     *
+     * Las que creó el usuario se borran del archivo. La que **viene con la
+     * app** (la del salón del 11G) también se puede borrar: queda anotada en
+     * los ajustes para que no vuelva a salir cada vez que se abre la app, y
+     * se puede devolver desde la misma pantalla.
+     */
     fun eliminarLista(id: String): Boolean {
         val lista = _listas.value.firstOrNull { it.id == id } ?: return false
-        if (lista.bloqueada) return false
+
+        if (lista.bloqueada) {
+            _listas.value = _listas.value.filter { it.id != id }
+            _listaDelColegioBorrada.value = true
+            preferencias.guardarListaBorrada(id)
+            return true
+        }
 
         val propias = _listas.value.filter { !it.bloqueada && it.id != id }
         _listas.value = _listas.value.filter { it.bloqueada || it.id != id }
@@ -308,6 +342,20 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 "No se pudo borrar la lista del dispositivo. La lista sigue en memoria: no cierres la app todavía."
             return false
         }
+        return true
+    }
+
+    /**
+     * Devuelve la lista que viene con la app (la del salón del 11G), que el
+     * usuario había borrado.
+     */
+    fun restaurarListaDelColegio(): Boolean {
+        val delColegio = ListaSalon.lista ?: return false
+        if (_listas.value.any { it.id == delColegio.id }) return false
+
+        _listas.value = listOf(delColegio) + _listas.value
+        _listaDelColegioBorrada.value = false
+        preferencias.restaurarLista(delColegio.id)
         return true
     }
 }

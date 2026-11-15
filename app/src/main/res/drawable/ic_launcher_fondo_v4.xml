@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Fondo del icono "Creciente" (v4).
+    Fondo del icono "Destello" (v4).
 
     Se genera con tools/generar-iconos-aura.py: el degradado tiene que ser
     el MISMO que el del PNG del icono antiguo, o se ven distintos.

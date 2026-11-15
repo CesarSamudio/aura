@@ -54,10 +54,12 @@ DENSIDADES = [
 
 # Los 4 iconos. "fondo" es el degradado (de arriba-izquierda a abajo-derecha
 # en 135 grados) y "glifo" el color de la figura.
+# Todos hablan de DINERO (que es lo que la app maneja): una moneda, un
+# billete, una pila de monedas y un destello con una moneda.
 VARIANTES = [
     {
         "id": "v1",
-        "nombre": "Orbita",
+        "nombre": "Aureola",
         "fondo1": (30, 27, 75),      # #1E1B4B
         "fondo2": (124, 58, 237),    # #7C3AED
         "glifo": (255, 255, 255),
@@ -65,23 +67,23 @@ VARIANTES = [
     },
     {
         "id": "v2",
-        "nombre": "Chispa",
-        "fondo1": (124, 45, 18),     # #7C2D12
-        "fondo2": (245, 158, 11),    # #F59E0B
-        "glifo": (255, 251, 235),
-        "brillo": (254, 215, 170),
-    },
-    {
-        "id": "v3",
-        "nombre": "Corona",
+        "nombre": "Billete",
         "fondo1": (6, 78, 59),       # #064E3B
         "fondo2": (16, 185, 129),    # #10B981
         "glifo": (236, 253, 245),
         "brillo": (167, 243, 208),
     },
     {
+        "id": "v3",
+        "nombre": "Cascada",
+        "fondo1": (124, 45, 18),     # #7C2D12
+        "fondo2": (245, 158, 11),    # #F59E0B
+        "glifo": (255, 251, 235),
+        "brillo": (254, 215, 170),
+    },
+    {
         "id": "v4",
-        "nombre": "Creciente",
+        "nombre": "Destello",
         "fondo1": (80, 7, 36),       # #500724
         "fondo2": (236, 72, 153),    # #EC4899
         "glifo": (253, 242, 248),
@@ -265,11 +267,90 @@ def glifo_creciente(d, v):
     circulo(d, cx + M * 0.165, cy - M * 0.075, M * 0.082)
 
 
+def simbolo_dolar(d, cx, cy, alto, grosor):
+    """
+    El signo **$** calado en la máscara: la S de los dos arcos y la barra.
+
+    Se dibuja en una capa aparte y se "pasa" con fill=0, que en una máscara
+    significa QUITAR (queda el fondo). Por eso el $ sale calado en la moneda
+    o en el billete, y no pegado encima.
+
+    La S son dos arcos de círculo que se tocan en el medio (el de arriba abre
+    a la izquierda y el de abajo a la derecha). `alto` es la altura de la S.
+    """
+    capa = Image.new("L", (M, M), 0)
+    dc = ImageDraw.Draw(capa)
+    r = alto / 4.0
+    # El arco de arriba: del centro (abajo de su círculo) por la izquierda y
+    # el remate hasta arriba a la derecha.
+    dc.arc([cx - r, cy - 2 * r, cx + r, cy], 90, 315, fill=255, width=grosor)
+    # El arco de abajo: del centro por la derecha, el fondo y el remate.
+    dc.arc([cx - r, cy, cx + r, cy + 2 * r], 270, 560, fill=255, width=grosor)
+    # La barra vertical que atraviesa la S.
+    dc.line([(cx, cy - alto * 0.62), (cx, cy + alto * 0.62)], fill=255, width=grosor)
+    d.bitmap((0, 0), capa, fill=0)
+
+
+def moneda_con_dolar(d, cx, cy, r):
+    """Moneda con el $ calado: un disco con el signo adentro."""
+    circulo(d, cx, cy, r)
+    simbolo_dolar(d, cx, cy, r * 1.28, max(2, int(r * 0.135)))
+
+
+def glifo_aureola(d, v):
+    """Una moneda con su aureola: el 'aura' de Aura, pero del dinero."""
+    cx = cy = M / 2
+    # La aureola: un anillo redondo alrededor de la moneda.
+    radio = M * 0.30
+    d.ellipse(
+        [cx - radio, cy - radio, cx + radio, cy + radio],
+        outline=255,
+        width=int(M * 0.038)
+    )
+    moneda_con_dolar(d, cx, cy, M * 0.185)
+
+
+def glifo_billete(d, v):
+    """Un billete con el $ calado y un destello en la esquina."""
+    ancho, alto = M * 0.56, M * 0.325
+    capa = Image.new("L", (M, M), 0)
+    dc = ImageDraw.Draw(capa)
+    dc.rounded_rectangle(
+        [M / 2 - ancho / 2, M / 2 - alto / 2, M / 2 + ancho / 2, M / 2 + alto / 2],
+        radius=int(M * 0.05),
+        fill=255
+    )
+    # El billete va un poco inclinado: parece más vivo que recto.
+    capa = capa.rotate(-10, resample=Image.BICUBIC, center=(M / 2, M / 2))
+    d.bitmap((0, 0), capa, fill=255)
+    # El $ calado en el centro.
+    simbolo_dolar(d, M / 2, M / 2, M * 0.235, int(M * 0.026))
+    # El destello de la esquina.
+    d.polygon(chispa_4_puntas(M * 0.715, M * 0.285, M * 0.115, M * 0.030), fill=255)
+
+
+def glifo_cascada(d, v):
+    """Tres monedas cayendo en diagonal: el dinero que entra."""
+    for cx, cy, r in (
+        (M * 0.375, M * 0.360, M * 0.125),
+        (M * 0.545, M * 0.485, M * 0.108),
+        (M * 0.645, M * 0.605, M * 0.088)
+    ):
+        moneda_con_dolar(d, cx, cy, r)
+
+
+def glifo_destello(d, v):
+    """Una moneda en medio de un destello de cuatro puntas."""
+    cx = cy = M / 2
+    d.polygon(chispa_4_puntas(cx, cy, M * 0.315, M * 0.082), fill=255)
+    moneda_con_dolar(d, cx, cy, M * 0.155)
+
+
 GLIFOS = {
-    "v1": glifo_orbita,
-    "v2": glifo_chispa,
-    "v3": glifo_corona,
-    "v4": glifo_creciente,
+    "v1": glifo_aureola,
+    "v2": glifo_billete,
+    "v3": glifo_cascada,
+    "v4": glifo_destello,
 }
 
 

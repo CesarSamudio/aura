@@ -36,6 +36,30 @@ class Preferencias(private val carpeta: File) {
     /** El id del ícono elegido; `null` si todavía no se eligió ninguno. */
     fun iconoId(): String? = leer()?.icono
 
+    /**
+     * Las listas que vienen con la app (la del salón del 11G) que el usuario
+     * borró.
+     *
+     * La lista del salón no está en `listas.json` (viene con el código), así
+     * que para que no vuelva a salir en cada apertura hay que anotar acá que
+     * el usuario la quitó.
+     */
+    fun listasBorradas(): List<String> = leer()?.listasBorradas ?: emptyList()
+
+    /** Anota que una lista que viene con la app fue borrada. */
+    fun guardarListaBorrada(id: String) {
+        val actual = leer() ?: AjustesLocales()
+        if (id in actual.listasBorradas) return
+        escribir(actual.copy(listasBorradas = actual.listasBorradas + id))
+    }
+
+    /** Saca la anotación: la lista vuelve a salir. */
+    fun restaurarLista(id: String) {
+        val actual = leer() ?: AjustesLocales()
+        if (id !in actual.listasBorradas) return
+        escribir(actual.copy(listasBorradas = actual.listasBorradas - id))
+    }
+
     /** Guarda el tema elegido (el ícono se queda como está). */
     fun guardarTema(id: String) {
         escribir((leer() ?: AjustesLocales()).copy(tema = id))
@@ -86,5 +110,7 @@ data class AjustesLocales(
     /** Id del tema elegido (ver `CatalogoTemas`). */
     val tema: String? = null,
     /** Id del ícono de la app elegido (ver `CatalogoIconos`). */
-    val icono: String? = null
+    val icono: String? = null,
+    /** Ids de las listas que vienen con la app y el usuario borró. */
+    val listasBorradas: List<String> = emptyList()
 )

@@ -27,8 +27,8 @@ android {
         // que existe de forma nativa desde la 26: se resuelve con desugaring.
         minSdk = 24
         targetSdk = 35
-        versionCode = 12
-        versionName = "1.11"
+        versionCode = 13
+        versionName = "1.12"
     }
 
     // -----------------------------------------------------------------

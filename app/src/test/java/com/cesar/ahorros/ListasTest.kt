@@ -87,12 +87,21 @@ class ListasTest {
     }
 
     @Test
-    fun `la lista que viene con la app esta bloqueada para que no se pueda borrar`() {
-        // En la versión del 11G viene la del salón (y no se puede borrar);
-        // en la versión general no viene ninguna.
+    fun `la lista que viene con la app no se guarda en el archivo del usuario`() {
+        // En la versión del 11G viene la del salón; en la general no viene
+        // ninguna. "bloqueada" marca de dónde viene (viene con el código, no se
+        // guarda en listas.json), NO que no se pueda borrar: desde el 15/11 se
+        // puede borrar y después devolver.
         val delColegio = ListaSalon.lista
         if (delColegio != null) {
-            assertTrue("La lista que viene con la app no se puede borrar", delColegio.bloqueada)
+            assertTrue(
+                "La lista que viene con la app tiene que estar marcada como tal",
+                delColegio.bloqueada
+            )
+            assertTrue(
+                "La lista que viene con la app tiene que traer gente",
+                delColegio.personas.isNotEmpty()
+            )
         }
     }
 }

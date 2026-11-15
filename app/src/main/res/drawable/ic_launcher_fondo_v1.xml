@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Fondo del icono "Orbita" (v1).
+    Fondo del icono "Aureola" (v1).
 
     Se genera con tools/generar-iconos-aura.py: el degradado tiene que ser
     el MISMO que el del PNG del icono antiguo, o se ven distintos.

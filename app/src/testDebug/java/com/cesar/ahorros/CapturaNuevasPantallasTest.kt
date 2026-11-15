@@ -7,16 +7,19 @@ import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cesar.ahorros.data.Deuda
+import com.cesar.ahorros.data.ListaDeGente
 import com.cesar.ahorros.data.MetodoPago
 import com.cesar.ahorros.data.ModoDeuda
 import com.cesar.ahorros.data.Pago
 import com.cesar.ahorros.data.PersonaDeuda
 import com.cesar.ahorros.ui.CatalogoTemas
 import com.cesar.ahorros.ui.PantallaAjustes
+import com.cesar.ahorros.ui.PantallaAnadirPersonas
 import com.cesar.ahorros.ui.PantallaDeudaDetalle
 import com.cesar.ahorros.ui.TemaAhorros
 import org.junit.Assert.assertEquals
@@ -213,10 +216,51 @@ class CapturaNuevasPantallasTest {
             }
         }
         composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithText("Órbita").assertExists()
-        composeTestRule.onNodeWithText("Chispa").assertExists()
-        composeTestRule.onNodeWithText("Corona").assertExists()
-        composeTestRule.onNodeWithText("Creciente").assertExists()
+        composeTestRule.onNodeWithText("Aureola").assertExists()
+        composeTestRule.onNodeWithText("Billete").assertExists()
+        composeTestRule.onNodeWithText("Cascada").assertExists()
+        composeTestRule.onNodeWithText("Destello").assertExists()
         guardar("09-ajustes-iconos.png", capturarPantalla())
+    }
+
+    // =====================================================================
+    // La lista que viene con la app (la del salón del 11G) también se borra
+    // =====================================================================
+
+    @Test
+    fun `10 la lista del salon tambien tiene papelera`() {
+        // La lista del salón viene con la app, pero el usuario la puede borrar
+        // (y después devolverla). Antes la papelera solo salía en las listas
+        // que había creado el usuario.
+        val delSalon = ListaDeGente(
+            id = "salon11g",
+            nombre = "Salón 11G",
+            personas = listOf(
+                "Kenneth Yassir Alvarado Hurtado",
+                "Angel Emanuel Badillo Gallardo",
+                "Danna Isabella Delgado Gonzalez"
+            ),
+            bloqueada = true
+        )
+        composeTestRule.setContent {
+            TemaAhorros {
+                PantallaAnadirPersonas(
+                    cuotaBase = 1.90,
+                    yaAgregadas = emptyList(),
+                    listas = listOf(delSalon),
+                    listaDelColegioBorrada = false,
+                    nombreListaDelColegio = delSalon.nombre,
+                    onCrearLista = { _, _ -> },
+                    onEliminarLista = { },
+                    onRestaurarListaDelColegio = { },
+                    onConfirmar = { },
+                    onCancelar = { }
+                )
+            }
+        }
+        composeTestRule.waitForIdle()
+        // La papelera sale en la lista del salón también.
+        composeTestRule.onNodeWithContentDescription("Eliminar lista").assertExists()
+        guardar("10-lista-del-salon.png", capturarPantalla())
     }
 }

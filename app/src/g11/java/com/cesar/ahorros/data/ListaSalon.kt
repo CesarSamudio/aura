@@ -5,8 +5,12 @@ package com.cesar.ahorros.data
  *
  * **Esta versión de la app es la del 11G**: trae la lista ya escrita, con los
  * 24 compañeros, para no tener que escribir los nombres a mano cuando se
- * arma una deuda. Viene con el código, así que no se puede borrar ni cambiar
- * (las listas que crea el usuario sí se pueden).
+ * arma una deuda. Viene con el código, así que sale sola cada vez que se abre
+ * la app (las listas que crea el usuario sí se guardan).
+ *
+ * **Se puede borrar igual** (Cesar lo pidió el 15/11): si el usuario la borra,
+ * queda anotada en los ajustes y no vuelve a salir sola; el botón "Devolver la
+ * lista" la trae de vuelta.
  *
  * La lista original de Cesar saltaba del número 7 al 9 (no estaba el 8).
  * Se dejó tal cual: si falta alguien, se agrega.
