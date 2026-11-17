@@ -9,10 +9,13 @@ import java.io.File
 /**
  * Los ajustes que la app recuerda entre sesiones.
  *
- * Por ahora hay dos: **el tema elegido** y **el ícono de la app**. Se guardan
- * en un archivo JSON dentro del almacenamiento interno (como los movimientos y
- * las deudas), así que entra también en la copia de seguridad: si respaldás y
- * restaurás, el tema y el ícono vuelven con los datos.
+ * Son tres: **el tema elegido**, **la apariencia** (los colores que el
+ * usuario cambió a mano, el fondo y las animaciones) y **las listas que
+ * vienen con la app y el usuario borró**.
+ *
+ * Se guardan en un archivo JSON dentro del almacenamiento interno (como los
+ * movimientos y las deudas), así que entra también en la copia de seguridad:
+ * si respaldás y restaurás, el tema y los colores vuelven con los datos.
  *
  * Sin base de datos, sin SharedPreferences y sin permisos: es un archivo de
  * una línea dentro de la carpeta de la app.
@@ -33,8 +36,13 @@ class Preferencias(private val carpeta: File) {
     /** El id del tema elegido; `null` si todavía no se eligió ninguno. */
     fun temaId(): String? = leer()?.tema
 
-    /** El id del ícono elegido; `null` si todavía no se eligió ninguno. */
-    fun iconoId(): String? = leer()?.icono
+    /**
+     * Los ajustes de apariencia (colores, fondo y animaciones).
+     *
+     * Si el archivo no existe todavía, sale la de por defecto: la app se ve
+     * como salió de fábrica.
+     */
+    fun apariencia(): AjustesApariencia = leer()?.apariencia ?: AjustesApariencia()
 
     /**
      * Las listas que vienen con la app (la del salón del 11G) que el usuario
@@ -60,14 +68,20 @@ class Preferencias(private val carpeta: File) {
         escribir(actual.copy(listasBorradas = actual.listasBorradas - id))
     }
 
-    /** Guarda el tema elegido (el ícono se queda como está). */
+    /** Guarda el tema elegido (todo lo demás se queda como está). */
     fun guardarTema(id: String) {
         escribir((leer() ?: AjustesLocales()).copy(tema = id))
     }
 
-    /** Guarda el ícono elegido (el tema se queda como está). */
-    fun guardarIcono(id: String) {
-        escribir((leer() ?: AjustesLocales()).copy(icono = id))
+    /**
+     * Guarda los ajustes de apariencia (colores, fondo y animaciones).
+     *
+     * Es un solo archivo para todo: así no se pisan las escrituras (dos
+     * `escribir` seguidos podrían pisarse) y la copia de seguridad lleva
+     * todo junto.
+     */
+    fun guardarApariencia(apariencia: AjustesApariencia) {
+        escribir((leer() ?: AjustesLocales()).copy(apariencia = apariencia))
     }
 
     private fun leer(): AjustesLocales? = try {
@@ -109,8 +123,8 @@ class Preferencias(private val carpeta: File) {
 data class AjustesLocales(
     /** Id del tema elegido (ver `CatalogoTemas`). */
     val tema: String? = null,
-    /** Id del ícono de la app elegido (ver `CatalogoIconos`). */
-    val icono: String? = null,
     /** Ids de las listas que vienen con la app y el usuario borró. */
-    val listasBorradas: List<String> = emptyList()
+    val listasBorradas: List<String> = emptyList(),
+    /** Los colores, el fondo y las animaciones que el usuario personalizó. */
+    val apariencia: AjustesApariencia = AjustesApariencia()
 )

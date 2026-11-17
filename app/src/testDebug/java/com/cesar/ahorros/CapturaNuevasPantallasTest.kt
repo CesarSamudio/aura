@@ -6,9 +6,12 @@ import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cesar.ahorros.data.Deuda
@@ -194,20 +197,21 @@ class CapturaNuevasPantallasTest {
     }
 
     // =====================================================================
-    // El selector de icono
+    // La sección de Apariencia (ya no hay selector de ícono: la app tiene
+    // un solo logo)
     // =====================================================================
 
     @Test
-    fun `09 ajustes con el selector de icono`() {
+    fun `09 ajustes con la seccion de apariencia`() {
         composeTestRule.setContent {
             TemaAhorros {
                 PantallaAjustes(
-                    versionApp = "1.11",
+                    versionApp = "1.14",
                     temas = CatalogoTemas.todos,
                     temaActualId = "clasico",
                     onCambiarTema = { },
-                    iconoActualId = "v1",
-                    onCambiarIcono = { },
+                    onElegirFondo = { },
+                    onQuitarFondo = { },
                     onVolver = { },
                     onExportar = { },
                     onRestaurar = { },
@@ -216,11 +220,42 @@ class CapturaNuevasPantallasTest {
             }
         }
         composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithText("Aureola").assertExists()
-        composeTestRule.onNodeWithText("Billete").assertExists()
-        composeTestRule.onNodeWithText("Cascada").assertExists()
-        composeTestRule.onNodeWithText("Destello").assertExists()
-        guardar("09-ajustes-iconos.png", capturarPantalla())
+        // Los dos plegables grandes de la sección.
+        composeTestRule.onNodeWithText("Temas").assertExists()
+        composeTestRule.onNodeWithText("Tema personalizado").assertExists()
+        guardar("09-ajustes-apariencia.png", capturarPantalla())
+    }
+
+    @Test
+    fun `09b ajustes con la paleta de colores abierta`() {
+        composeTestRule.setContent {
+            TemaAhorros {
+                PantallaAjustes(
+                    versionApp = "1.14",
+                    temas = CatalogoTemas.todos,
+                    temaActualId = "clasico",
+                    onCambiarTema = { },
+                    onElegirFondo = { },
+                    onQuitarFondo = { },
+                    onVolver = { },
+                    onExportar = { },
+                    onRestaurar = { },
+                    onCerrar = { }
+                )
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        // Abrir "Tema personalizado" y, adentro, "Colores".
+        composeTestRule.onNodeWithText("Tema personalizado").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("Colores").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+
+        // La paleta del tema y la de los textos tienen que estar.
+        composeTestRule.onNodeWithText("Acento de marca").assertExists()
+        composeTestRule.onNodeWithText("Texto principal").assertExists()
+        guardar("09b-ajustes-colores.png", capturarPantalla())
     }
 
     // =====================================================================

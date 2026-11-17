@@ -31,10 +31,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.cesar.ahorros.data.EstiloInterfaz
 import com.cesar.ahorros.data.Movimiento
 import com.cesar.ahorros.data.Tipo
 import com.cesar.ahorros.R
@@ -67,6 +69,10 @@ fun PantallaBalance(movimientos: List<Movimiento>, onAjustes: () -> Unit) {
         movimientos.filter { !it.fecha.isBefore(desde) }
     }
 
+    // La cifra grande cuenta hasta su valor (si el usuario dejó las
+    // animaciones prendidas).
+    val netoAnimado = rememberNumeroAnimado(neto)
+
     val puntosBarra = remember(enPeriodo, periodo) { construirBarras(enPeriodo, periodo) }
     val acumulado = remember(enPeriodo, periodo) { construirAcumulado(enPeriodo, periodo) }
     // La paleta de la dona depende del tema: si cambia, hay que volver a
@@ -89,7 +95,7 @@ fun PantallaBalance(movimientos: List<Movimiento>, onAjustes: () -> Unit) {
                         color = TextoSecundario
                     )
                     Text(
-                        text = neto.dineroSimbolo(),
+                        text = netoAnimado.value.dineroSimbolo(),
                         style = MaterialTheme.typography.displaySmall,
                         color = if (neto < 0) ColorGasto else AcentoMenta,
                         fontWeight = FontWeight.Bold
@@ -122,14 +128,16 @@ fun PantallaBalance(movimientos: List<Movimiento>, onAjustes: () -> Unit) {
                     valor = totalAhorros.dineroSimbolo(),
                     colorValor = AcentoMenta,
                     pie = "depositado",
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    valorAnimado = totalAhorros
                 )
                 TarjetaKpi(
                     titulo = "Gastos",
                     valor = totalGastos.dineroSimbolo(),
                     colorValor = ColorGasto,
                     pie = "consumido",
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    valorAnimado = totalGastos
                 )
             }
         }
@@ -289,10 +297,29 @@ private fun construirResumen(movimientos: List<Movimiento>): List<FilaResumen> {
 
 @Composable
 private fun TarjetaPanel(titulo: String, contenido: @Composable () -> Unit) {
+    // La entrada del panel: cómo se asienta, se desliza o se funde depende
+    // del estilo que eligió el usuario en Ajustes.
+    val entrada = progresoDeEntrada()
+    val estilo = AparienciaActual.estiloInterfaz
+
     Card(
         colors = CardDefaults.cardColors(containerColor = Superficie),
         shape = RoundedCornerShape(RadioTarjeta),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                alpha = if (estilo == EstiloInterfaz.ESCALAR) 1f else entrada
+                val escala = if (estilo == EstiloInterfaz.ESCALAR) {
+                    0.94f + 0.06f * entrada
+                } else {
+                    1f
+                }
+                scaleX = escala
+                scaleY = escala
+                if (estilo == EstiloInterfaz.DESLIZAR) {
+                    translationY = (1f - entrada) * 18f
+                }
+            }
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(

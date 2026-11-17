@@ -1,24 +1,22 @@
 # -*- coding: utf-8 -*-
 """
-Genera los 4 iconos de la app "Aura" (PNG + los XML de fondo).
+Genera el icono de la app "Aura" (PNG + los XML de fondo).
 
 El logo de la app se dibuja ACÁ, en un solo lugar: de este script salen
 todos los archivos (los PNG de cada densidad y el vector del fondo), así que
 el icono adaptativo y el icono antiguo nunca se contradicen entre sí.
 
-Los 4 conceptos:
-  v1  Orbita    - una moneda con un anillo inclinado (como un planeta).
-  v2  Chispa    - una destello de 4 puntas (la "chispa" de la app).
-  v3  Ondas     - una moneda con tres ondas que suben desde ella.
-  v4  Creciente - una luna con una moneda dentro de su hueco.
+Aura tiene UN solo logo, el "Aureola": una moneda con su aureola. Antes
+había cuatro (Aureola, Billete, Cascada y Destello) y se elegía en Ajustes;
+se quitó esa opción, así que acá solo se dibuja el que se usa.
 
 Uso:
     python tools/generar-iconos-aura.py
 
 Salida:
-    01-proyectos/ahorros-app/app/src/main/res/mipmap-<densidad>/ic_launcher_v<N>*.png
-    01-proyectos/ahorros-app/app/src/main/res/drawable/ic_launcher_fondo_v<N>.xml
-    _iconos-aura/contacto.png   (hoja de contactos para mirar los 4 de un jalón)
+    01-proyectos/ahorros-app/app/src/main/res/mipmap-<densidad>/ic_launcher_v1*.png
+    01-proyectos/ahorros-app/app/src/main/res/drawable/ic_launcher_fondo_v1.xml
+    _iconos-aura/contacto.png   (hoja de contactos con el logo)
 """
 
 import math
@@ -52,10 +50,9 @@ DENSIDADES = [
     ("xxxhdpi", 4.0),
 ]
 
-# Los 4 iconos. "fondo" es el degradado (de arriba-izquierda a abajo-derecha
-# en 135 grados) y "glifo" el color de la figura.
-# Todos hablan de DINERO (que es lo que la app maneja): una moneda, un
-# billete, una pila de monedas y un destello con una moneda.
+# El único icono de la app. "fondo" es el degradado (de arriba-izquierda a
+# abajo-derecha en 135 grados) y "glifo" el color de la figura.
+# Habla de DINERO (que es lo que la app maneja): una moneda con su aureola.
 VARIANTES = [
     {
         "id": "v1",
@@ -64,30 +61,6 @@ VARIANTES = [
         "fondo2": (124, 58, 237),    # #7C3AED
         "glifo": (255, 255, 255),
         "brillo": (167, 243, 252),
-    },
-    {
-        "id": "v2",
-        "nombre": "Billete",
-        "fondo1": (6, 78, 59),       # #064E3B
-        "fondo2": (16, 185, 129),    # #10B981
-        "glifo": (236, 253, 245),
-        "brillo": (167, 243, 208),
-    },
-    {
-        "id": "v3",
-        "nombre": "Cascada",
-        "fondo1": (124, 45, 18),     # #7C2D12
-        "fondo2": (245, 158, 11),    # #F59E0B
-        "glifo": (255, 251, 235),
-        "brillo": (254, 215, 170),
-    },
-    {
-        "id": "v4",
-        "nombre": "Destello",
-        "fondo1": (80, 7, 36),       # #500724
-        "fondo2": (236, 72, 153),    # #EC4899
-        "glifo": (253, 242, 248),
-        "brillo": (251, 207, 232),
     },
 ]
 
@@ -476,10 +449,10 @@ def icono_adaptativo(v, con_monocromo):
 
 
 def hoja_contacto():
-    """Una imagen con los 4 iconos (grande y chiquito) para mirarlos de un jalon."""
+    """Una imagen con el icono (grande y chiquito) para mirarlo de un jalon."""
     grande, chico = 220, 64
     pad = 24
-    ancho = pad * 2 + 4 * (grande + pad)
+    ancho = pad * 2 + len(VARIANTES) * (grande + pad)
     alto = pad * 2 + grande + 24 + chico + 40
     hoja = Image.new("RGB", (ancho, alto), (18, 18, 22))
     dd = ImageDraw.Draw(hoja)
@@ -513,10 +486,6 @@ def main():
             # Icono antiguo (Android 7): el diseño completo, recortado.
             escribe(cuadrado, os.path.join(base, f"ic_launcher_{v['id']}.png"), int(48 * factor))
             escribe(circulo, os.path.join(base, f"ic_launcher_{v['id']}_round.png"), int(48 * factor))
-            # La vista previa de Ajustes: el diseño completo en un PNG aparte.
-            # Compose no sabe pintar un "adaptive-icon" (es un XML que solo
-            # entiende el launcher), asi que la vista previa usa esta.
-            escribe(cuadrado, os.path.join(base, f"ic_previa_{v['id']}.png"), int(48 * factor))
 
         fondo_vector(v, os.path.join(RES, "drawable", f"ic_launcher_fondo_{v['id']}.xml"))
 

@@ -13,10 +13,10 @@ Hay dos versiones de la misma app. La diferencia es **una sola lista de 24 nombr
 
 | Versión | Para quién | Archivo |
 |---|---|---|
-| **Aura v1.13** | Cualquiera | [`apk/Aura-v1.13.apk`](apk/Aura-v1.13.apk) |
-| **Aura 11G v1.13** | Los del 11G: trae la lista del salón ya escrita | [`apk/Aura-v1.13-11G.apk`](apk/Aura-v1.13-11G.apk) |
+| **Aura v1.14** | Cualquiera | [`apk/Aura-v1.14.apk`](apk/Aura-v1.14.apk) |
+| **Aura 11G v1.14** | Los del 11G: trae la lista del salón ya escrita | [`apk/Aura-v1.14-11G.apk`](apk/Aura-v1.14-11G.apk) |
 
-> **Instalá `Aura-v1.13.apk` si no sos del 11G.**
+> **Instalá `Aura-v1.14.apk` si no sos del 11G.**
 > La del 11G es EXACTAMENTE la misma app con la lista del salón escrita de antemano
 > (para no tener que teclear los 24 nombres). Además instala con otro paquete, así que
 > las dos conviven en el mismo teléfono sin pisarse.
@@ -24,7 +24,7 @@ Hay dos versiones de la misma app. La diferencia es **una sola lista de 24 nombr
 Para instalar: copiá el `.apk` al teléfono y abrilo. Android va a pedir permiso para
 instalar apps de fuentes desconocidas: es normal, es el aviso de siempre.
 
-Si preferís bajarlo de GitHub, los mismos `.apk` están en la [release v1.13](https://github.com/CesarSamudio/aura/releases/tag/v1.13).
+Si preferís bajarlo de GitHub, los mismos `.apk` están en la [release v1.14](https://github.com/CesarSamudio/aura/releases/tag/v1.14).
 
 ## Qué hace
 
@@ -37,6 +37,16 @@ Si preferís bajarlo de GitHub, los mismos `.apk` están en la [release v1.13](h
   guardadas para las próximas deudas: abrís, marcás lo que falta y listo.
 - **7 temas**: negro y naranja, y además Osmo, Caldera, SafePal, Boost, Mode y Trunk
   (claros y oscuros). Se cambian en **Ajustes → Apariencia** y se aplican al instante.
+- **Colores a tu gusto**: además de los temas, se puede cambiar **cada color por
+  separado** (la paleta de la app y la de los textos) con un selector de color que
+  te dice, en vivo, si ese color se lee o no.
+- **Fondo con tu foto**: se elige una imagen del teléfono (la app la reescala para
+  que se vea bien y no pese tanto) y se le ajusta la opacidad y el difuminado.
+- **Fondo animado**: degradados que se mueven (aureola, aurora, barrido, cónico o
+  malla), con su opacidad, velocidad e intensidad.
+- **Animaciones a tu medida**: las gráficas, los números y la interfaz se pueden
+  apagar, acelerar o frenar, y cada cosa tiene su estilo. Apretando y soltando
+  una opción te explica qué hace.
 - **Copia de seguridad**: genera un `.zip` con todo y lo guardás donde quieras
   (Drive, WhatsApp, correo). Sin nube y sin cuentas.
 
@@ -89,10 +99,18 @@ Sin la clave, el build compila igual pero el APK sale **sin firmar** (no se pued
 - **MVVM** con `StateFlow`; los datos se guardan en **JSON plano** dentro de la carpeta
   de la app (`movimientos.json`, `deudas.json`, `listas.json`, `ajustes.json`).
 - **Sin base de datos**: para este volumen es instantáneo y no pesa nada en el APK.
-- **161 tests** en verde, entre ellos uno que mide el **contraste de color de los 7
-  temas contra WCAG 2.2 AA**.
+- **204 tests** en verde (234 con las capturas), entre ellos uno que mide el
+  **contraste de color de los 7 temas contra WCAG 2.2 AA** y otro que mide el
+  contraste de los colores que personaliza el usuario.
 - Las capturas de pantalla de los tests se generan en el PC con **Robolectric**
   (gráficos nativos), sin emulador.
+
+## Las capturas
+
+| | |
+|---|---|
+| ![Ajustes: los temas](docs/ajustes-apariencia.png) | ![Ajustes: la paleta a tu gusto](docs/ajustes-colores.png) |
+| **Ajustes → Apariencia**: los temas de fábrica | **Colores**: cada color por separado, con su hexadecimal |
 
 ## Licencia
 

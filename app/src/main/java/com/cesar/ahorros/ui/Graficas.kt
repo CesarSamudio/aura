@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
@@ -34,6 +35,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.cesar.ahorros.data.EstiloGraficas
 import kotlin.math.max
 import kotlin.math.min
 
@@ -57,7 +59,19 @@ fun GraficaBarras(
     val medidor = rememberTextMeasurer()
     val estiloEje = TextStyle(fontSize = 10.sp, color = TextoSecundario)
 
-    Canvas(modifier = modifier.height(190.dp)) {
+    // El progreso con el que se dibuja la gráfica ahora mismo. Con las
+    // animaciones apagadas vale 1: se ve todo de una, como siempre.
+    val progreso = progresoDeGraficas()
+    val estilo = AparienciaActual.estiloGraficas
+
+    Canvas(
+        modifier = modifier
+            .height(190.dp)
+            // El estilo "Suave" no mueve nada: solo aparece.
+            .graphicsLayer {
+                if (estilo == EstiloGraficas.SUAVE) alpha = progreso
+            }
+    ) {
         if (puntos.isEmpty()) return@Canvas
 
         val maximo = (puntos.maxOf { max(it.ahorro, it.gasto) }).coerceAtLeast(1.0)
@@ -69,6 +83,13 @@ fun GraficaBarras(
         val anchoBarra = min(anchoGrupo * 0.3f, 13.dp.toPx())
         val separacion = 2.dp.toPx()
         val radio = 5.dp.toPx()
+
+        // Cuánto crecimiento tienen las barras. En el estilo "Suave" y en
+        // "Ninguna" las barras ya están completas: solo se funden.
+        val crecimiento = when (estilo) {
+            EstiloGraficas.CRECER -> progreso
+            else -> 1f
+        }
 
         // Rejilla + valores del eje Y
         for (i in 0..3) {
@@ -92,8 +113,8 @@ fun GraficaBarras(
 
         puntos.forEachIndexed { indice, punto ->
             val centro = margenIzq + anchoGrupo * indice + anchoGrupo / 2f
-            val alturaAhorro = (punto.ahorro / maximo * altoUtil).toFloat()
-            val alturaGasto = (punto.gasto / maximo * altoUtil).toFloat()
+            val alturaAhorro = (punto.ahorro / maximo * altoUtil * crecimiento).toFloat()
+            val alturaGasto = (punto.gasto / maximo * altoUtil * crecimiento).toFloat()
 
             // Ahorro: redondeo arriba (decrece hacia abajo)
             if (alturaAhorro > 0f) {
@@ -180,8 +201,15 @@ fun GraficaDona(
     modifier: Modifier = Modifier
 ) {
     val total = puntos.sumOf { it.valor }
+    val progreso = progresoDeGraficas()
+    val estilo = AparienciaActual.estiloGraficas
 
-    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+    Box(
+        modifier = modifier.graphicsLayer {
+            if (estilo == EstiloGraficas.SUAVE) alpha = progreso
+        },
+        contentAlignment = Alignment.Center
+    ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             if (puntos.isEmpty() || total <= 0.0) return@Canvas
             val grosor = 20.dp.toPx()
@@ -191,11 +219,15 @@ fun GraficaDona(
             var angulo = -90f
             puntos.forEach { punto ->
                 val barrido = (punto.valor / total * 360.0).toFloat()
+                // Con el estilo "Crecer" la dona se abre como un abanico:
+                // el barrido crece con el progreso.
+                val avance = if (estilo == EstiloGraficas.CRECER) barrido * progreso else barrido
+                if (avance <= 0f) return@forEach
                 // Separador: se dibuja el mismo arco con el color del fondo, mas grueso.
                 drawArc(
                     color = Fondo,
                     startAngle = angulo,
-                    sweepAngle = barrido,
+                    sweepAngle = avance,
                     useCenter = false,
                     topLeft = topLeft,
                     size = Size(diametro, diametro),
@@ -204,13 +236,13 @@ fun GraficaDona(
                 drawArc(
                     color = punto.color,
                     startAngle = angulo,
-                    sweepAngle = barrido,
+                    sweepAngle = avance,
                     useCenter = false,
                     topLeft = topLeft,
                     size = Size(diametro, diametro),
                     style = Stroke(width = grosor)
                 )
-                angulo += barrido
+                angulo += avance
             }
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -280,8 +312,25 @@ fun GraficaArea(
     val medidor = rememberTextMeasurer()
     val estiloEje = TextStyle(fontSize = 10.sp, color = TextoSecundario)
 
-    Canvas(modifier = modifier.height(170.dp)) {
-        if (valores.size < 2) return@Canvas
+    val progreso = progresoDeGraficas()
+    val estilo = AparienciaActual.estiloGraficas
+
+    // Con el estilo "Dibujar" la línea se escribe de izquierda a derecha:
+    // solo se dibuja la parte que ya "llegó".
+    val cuantos = when (estilo) {
+        EstiloGraficas.DIBUJAR -> (valores.size * progreso).toInt().coerceIn(2, valores.size)
+        else -> valores.size
+    }
+    val visibles = if (estilo == EstiloGraficas.DIBUJAR) valores.take(cuantos) else valores
+
+    Canvas(
+        modifier = modifier
+            .height(170.dp)
+            .graphicsLayer {
+                if (estilo == EstiloGraficas.SUAVE) alpha = progreso
+            }
+    ) {
+        if (visibles.size < 2) return@Canvas
 
         val maximo = valores.max()
         val minimo = valores.min()
@@ -290,6 +339,7 @@ fun GraficaArea(
         val margenInf = 16.dp.toPx()
         val anchoUtil = size.width - margenIzq
         val altoUtil = size.height - margenInf
+        // El eje se mantiene completo: la línea es la que se dibuja.
         val paso = anchoUtil / (valores.size - 1)
         val color = if (valores.last() < 0) ColorGasto else AcentoMenta
 
@@ -316,7 +366,7 @@ fun GraficaArea(
         }
 
         val linea = Path()
-        valores.forEachIndexed { indice, valor ->
+        visibles.forEachIndexed { indice, valor ->
             val x = margenIzq + paso * indice
             val y = yDe(valor)
             if (indice == 0) linea.moveTo(x, y) else linea.lineTo(x, y)
@@ -324,7 +374,7 @@ fun GraficaArea(
 
         val relleno = Path().apply {
             addPath(linea)
-            lineTo(margenIzq + paso * (valores.size - 1), altoUtil)
+            lineTo(margenIzq + paso * (visibles.size - 1), altoUtil)
             lineTo(margenIzq, altoUtil)
             close()
         }
@@ -343,8 +393,8 @@ fun GraficaArea(
         )
 
         // Punto en el ultimo valor: ancla la lectura del grafico.
-        val ultimoX = margenIzq + paso * (valores.size - 1)
-        val ultimoY = yDe(valores.last())
+        val ultimoX = margenIzq + paso * (visibles.size - 1)
+        val ultimoY = yDe(visibles.last())
         drawCircle(color = color, radius = 4.dp.toPx(), center = Offset(ultimoX, ultimoY))
         drawCircle(color = Fondo, radius = 1.6.dp.toPx(), center = Offset(ultimoX, ultimoY))
     }

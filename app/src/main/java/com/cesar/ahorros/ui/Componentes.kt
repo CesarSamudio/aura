@@ -31,25 +31,55 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.cesar.ahorros.data.EstiloInterfaz
 import com.cesar.ahorros.data.Movimiento
 import com.cesar.ahorros.data.Tipo
 import java.time.LocalDate
 
-/** Tarjeta de métrica: etiqueta pequeña, cifra grande y nota al pie. */
+/**
+ * Tarjeta de métrica: etiqueta pequeña, cifra grande y nota al pie.
+ *
+ * `valorAnimado` es el número con el que se cuenta: si viene, la cifra sube
+ * desde cero hasta ese valor (el estilo "Contar" de las animaciones). Si no
+ * viene, se muestra el texto tal cual.
+ */
 @Composable
 fun TarjetaKpi(
     titulo: String,
     valor: String,
     colorValor: Color,
     pie: String? = null,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    valorAnimado: Double? = null
 ) {
+    val numero = rememberNumeroAnimado(valorAnimado ?: 0.0)
+    val texto = if (valorAnimado != null) numero.value.dineroSimbolo() else valor
+
+    // La entrada de la tarjeta: el patrón "asentamiento con resorte" cuando
+    // el usuario elige "Asentar", un deslizamiento corto cuando elige
+    // "Deslizar" y un simple fundido cuando elige "Fundido".
+    val entrada = progresoDeEntrada()
+    val estilo = AparienciaActual.estiloInterfaz
+
     Card(
-        modifier = modifier,
+        modifier = modifier.graphicsLayer {
+            alpha = if (estilo == EstiloInterfaz.ESCALAR) 1f else entrada
+            val escala = if (estilo == EstiloInterfaz.ESCALAR) {
+                0.94f + 0.06f * entrada
+            } else {
+                1f
+            }
+            scaleX = escala
+            scaleY = escala
+            if (estilo == EstiloInterfaz.DESLIZAR) {
+                translationY = (1f - entrada) * 18f
+            }
+        },
         colors = CardDefaults.cardColors(containerColor = SuperficieAlta),
         shape = RoundedCornerShape(RadioTarjeta)
     ) {
@@ -61,7 +91,7 @@ fun TarjetaKpi(
             )
             Spacer(Modifier.height(6.dp))
             Text(
-                text = valor,
+                text = texto,
                 style = MaterialTheme.typography.titleLarge,
                 color = colorValor,
                 fontWeight = FontWeight.ExtraBold

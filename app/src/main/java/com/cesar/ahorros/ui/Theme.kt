@@ -7,7 +7,10 @@ import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -369,17 +372,57 @@ object CatalogoTemas {
  *
  * Es estado de Compose (`mutableStateOf`): cuando cambia, todo lo que lee un
  * token de color se redibuja solo, sin tocar ni una línea de las pantallas.
+ *
+ * Son dos cosas juntas:
+ *  - el **tema base** (uno de los 7 del catálogo), y
+ *  - la **paleta del usuario** (los colores que cambió a mano).
+ *
+ * El tema que se ve es el base con la paleta encima, y se recalcula solo
+ * cuando cambia cualquiera de las dos.
  */
 object TemaActual {
 
-    private val estado = mutableStateOf(CatalogoTemas.porDefecto)
+    private val base = mutableStateOf(CatalogoTemas.porDefecto)
 
-    /** El tema activo. */
-    var tema: TemaVisual
-        get() = estado.value
+    /** El tema del catálogo que está elegido (sin los colores del usuario). */
+    var temaBase: TemaVisual
+        get() = base.value
         set(valor) {
-            estado.value = valor
+            base.value = valor
         }
+
+    /**
+     * Los colores que el usuario cambió a mano.
+     *
+     * Vive en [AparienciaActual] (que es donde se guardan los demás ajustes
+     * de apariencia) pero se expone acá porque el tema es quien los usa.
+     */
+    var paleta: PaletaPersonalizada
+        get() = AparienciaActual.paleta
+        set(valor) {
+            AparienciaActual.paleta = valor
+        }
+
+    /**
+     * El tema que se ve: el base con la paleta del usuario encima.
+     *
+     * `derivedStateOf` lo recalcula SOLO cuando cambia el tema base o la
+     * paleta: por eso cambiar un color repinta la app entera sin tocar las
+     * pantallas, y leer el tema no cuesta nada.
+     */
+    val tema: TemaVisual by derivedStateOf {
+        base.value.conPaleta(AparienciaActual.paleta)
+    }
+
+    /**
+     * Una clave para los `remember`.
+     *
+     * Si solo se usara el id del tema, cambiar un color no volvería a
+     * dibujar lo que depende de los colores (por ejemplo, la paleta de la
+     * dona de las gráficas). Con esta clave, cualquier cambio repinta.
+     */
+    val clave: String
+        get() = "${base.value.id}#${AparienciaActual.paleta.huella}"
 
     /**
      * Cambia al tema con ese id.
@@ -387,8 +430,8 @@ object TemaActual {
      */
     fun aplicar(id: String?): Boolean {
         val nuevo = CatalogoTemas.porId(id)
-        if (nuevo.id == estado.value.id) return false
-        estado.value = nuevo
+        if (nuevo.id == base.value.id) return false
+        base.value = nuevo
         return true
     }
 }

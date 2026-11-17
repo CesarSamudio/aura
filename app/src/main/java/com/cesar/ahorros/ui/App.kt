@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -25,7 +26,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,22 +34,19 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.core.content.FileProvider
 import androidx.core.content.pm.PackageInfoCompat
 import com.cesar.ahorros.R
 import com.cesar.ahorros.data.AppViewModel
-import com.cesar.ahorros.data.CatalogoIconos
 import com.cesar.ahorros.data.CopiaLocal
 import com.cesar.ahorros.data.Deuda
-import com.cesar.ahorros.data.IconosApp
+import com.cesar.ahorros.data.FondosApp
 import com.cesar.ahorros.data.MetodoPago
 import com.cesar.ahorros.data.ModoDeuda
 import com.cesar.ahorros.data.Movimiento
@@ -145,14 +142,9 @@ fun App() {
     // botón "atrás".
     val activity = contexto.findActivity()
 
-    // Los ajustes que la app recuerda entre sesiones (por ahora, el tema).
+    // Los ajustes que la app recuerda entre sesiones (el tema y la
+    // apariencia: colores, fondo y animaciones).
     val preferencias = remember(contexto) { Preferencias(contexto) }
-
-    // El ícono elegido: se guarda en los ajustes y se aplica habilitando el
-    // alias del logo (es lo único que el sistema permite para cambiarlo).
-    var iconoActualId by rememberSaveable {
-        mutableStateOf(preferencias.iconoId() ?: CatalogoIconos.POR_DEFECTO)
-    }
 
     /** "1.7 (8)" — la versión de la app, para la pantalla de ajustes. */
     val versionApp = remember {
@@ -168,23 +160,43 @@ fun App() {
     }
 
     // ------------------------------------------------------------------
-    // El ícono del launcher
+    // El fondo: la foto del teléfono y el degradado animado
     // ------------------------------------------------------------------
-    // Se aplica cuando la app **sale de la pantalla**, no con la app a la
-    // vista: el MIUI de Xiaomi cierra la app y tira un error si la app cambia
-    // sus componentes (los "alias" del ícono) mientras está en primer plano.
-    // Así el cambio pasa cuando el usuario ya salió de la app.
-    val cicloDeVida = LocalLifecycleOwner.current.lifecycle
-    DisposableEffect(cicloDeVida, iconoActualId) {
-        val observador = LifecycleEventObserver { _, evento ->
-            if (evento == Lifecycle.Event.ON_STOP) {
-                if (IconosApp.hayQueAplicar(contexto, iconoActualId)) {
-                    IconosApp.aplicar(contexto, iconoActualId)
+    // El selector de fotos del sistema: no pide ningún permiso (la app sigue
+    // teniendo cero permisos) y devuelve una Uri que se puede leer.
+    val selectorDeFotos = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        uri?.let { elegida ->
+            alcance.launch {
+                val guardada = withContext(Dispatchers.IO) {
+                    FondosApp.guardarFondo(contexto, elegida)
+                }
+                if (guardada) {
+                    AparienciaActual.fondo = AparienciaActual.fondo.copy(
+                        imagen = FondosApp.NOMBRE_ARCHIVO
+                    )
+                    aviso = "Listo. Tu imagen quedó de fondo."
+                } else {
+                    aviso = "No se pudo usar esa imagen."
                 }
             }
         }
-        cicloDeVida.addObserver(observador)
-        onDispose { cicloDeVida.removeObserver(observador) }
+    }
+
+    // Los ajustes de apariencia se guardan solos en cuanto cambian: así el
+    // usuario no tiene que pensar en guardar nada.
+    LaunchedEffect(
+        AparienciaActual.paleta.huella,
+        AparienciaActual.animaciones,
+        AparienciaActual.fondo
+    ) {
+        preferencias.guardarApariencia(
+            AparienciaActual.paleta.aAjustes().copy(
+                animaciones = AparienciaActual.animaciones,
+                fondo = AparienciaActual.fondo
+            )
+        )
     }
 
     // ------------------------------------------------------------------
@@ -278,7 +290,7 @@ fun App() {
     }
 
     Scaffold(
-        containerColor = Fondo,
+        containerColor = if (AparienciaActual.hayFondo) Color.Transparent else Fondo,
         snackbarHost = { SnackbarHost(estadoSnackbar) },
         bottomBar = {
             if (!mostrarAjustes) {
@@ -344,6 +356,11 @@ fun App() {
                 .fillMaxSize()
                 .padding(bottom = padding.calculateBottomPadding())
         ) {
+            // El fondo (la foto del teléfono o el degradado animado) va POR
+            // DEBAJO de todo. Cuando no hay nada puesto, no se dibuja nada
+            // extra: el Scaffold sigue siendo el que pinta el fondo del tema.
+            FondoApp(Modifier.fillMaxSize())
+
             if (mostrarAjustes) {
                 PantallaAjustes(
                     versionApp = versionApp,
@@ -356,21 +373,16 @@ fun App() {
                             preferencias.guardarTema(id)
                         }
                     },
-                    iconoActualId = iconoActualId,
-                    onCambiarIcono = { id ->
-                        iconoActualId = id
-                        preferencias.guardarIcono(id)
-                        if (IconosApp.hayQueAplicar(contexto, id)) {
-                            if (IconosApp.esXiaomi()) {
-                                // En los teléfonos de Xiaomi (MIUI) cambiar el
-                                // ícono con la app a la vista cierra la app:
-                                // se aplica cuando el usuario sale.
-                                aviso = "Listo. En tu teléfono el ícono cambia al salir de la app."
-                            } else {
-                                IconosApp.aplicar(contexto, id)
-                                aviso = "Listo. Cambió el ícono de la app."
-                            }
-                        }
+                    onElegirFondo = {
+                        selectorDeFotos.launch(
+                            PickVisualMediaRequest(
+                                ActivityResultContracts.PickVisualMedia.ImageOnly
+                            )
+                        )
+                    },
+                    onQuitarFondo = {
+                        FondosApp.borrarFondo(contexto)
+                        AparienciaActual.fondo = AparienciaActual.fondo.copy(imagen = null)
                     },
                     onVolver = { mostrarAjustes = false },
                     onExportar = {

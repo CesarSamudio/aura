@@ -10,7 +10,6 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cesar.ahorros.ui.CatalogoTemas
-import com.cesar.ahorros.data.CatalogoIconos
 import com.cesar.ahorros.ui.PantallaAjustes
 import com.cesar.ahorros.ui.TemaActual
 import com.cesar.ahorros.ui.TemaAhorros
@@ -154,8 +153,8 @@ class CapturaTemasTest {
                     temas = CatalogoTemas.todos,
                     temaActualId = temaId,
                     onCambiarTema = { },
-                    iconoActualId = CatalogoIconos.POR_DEFECTO,
-                    onCambiarIcono = { },
+                    onElegirFondo = { },
+                    onQuitarFondo = { },
                     onVolver = { },
                     onExportar = { },
                     onRestaurar = { },

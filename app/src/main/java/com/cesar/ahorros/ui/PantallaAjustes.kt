@@ -3,7 +3,6 @@ package com.cesar.ahorros.ui
 import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -44,26 +43,31 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.cesar.ahorros.data.CatalogoIconos
-import com.cesar.ahorros.data.IconoApp
+import com.cesar.ahorros.data.ColorTema
+import com.cesar.ahorros.data.ColorTexto
+import com.cesar.ahorros.data.EstiloGraficas
+import com.cesar.ahorros.data.EstiloInterfaz
+import com.cesar.ahorros.data.EstiloNumeros
+import com.cesar.ahorros.data.FormaDegradado
+import com.cesar.ahorros.data.FondosApp
 
 /**
  * La pantalla de **Ajustes**.
  *
- * Cuatro secciones, en este orden:
- *  1. **Apariencia**: el selector de temas. Cada tema se ve con una
- *     mini-vista previa de cómo queda (fondo, texto y botón con su acento)
- *     y se aplica al instante, sin reiniciar la app.
- *  2. **Icono de la app**: los 4 logos con los que se puede abrir Aura en la
- *     pantalla del teléfono. El que se elige es el que se ve en el launcher.
- *  3. **Copia de seguridad**: el `.zip` que el usuario guarda donde él quiera
+ * Está dividida en **secciones** para que no sea una lista interminable:
+ *
+ *  1. **Apariencia**: los temas de fábrica (un plegable) y el tema
+ *     personalizado (otro plegable, con los colores, el fondo y las
+ *     animaciones adentro).
+ *  2. **Copia de seguridad**: el `.zip` que el usuario guarda donde él quiera
  *     (Drive, WhatsApp, correo...) y que puede volver a meter cuando la
  *     necesite.
- *  4. **Acerca de**: la app, su versión y dónde viven los datos.
+ *  3. **Acerca de**: la app, su versión y dónde viven los datos.
+ *
+ * Dentro de la primera sección todo lo nuevo está en plegables: el usuario
+ * ve "Temas" y "Tema personalizado", y solo abre lo que le interesa.
  *
  * No hay nube ni cuentas: la app no tiene ningún permiso y no habla con
  * nadie.
@@ -74,8 +78,8 @@ fun PantallaAjustes(
     temas: List<TemaVisual>,
     temaActualId: String,
     onCambiarTema: (String) -> Unit,
-    iconoActualId: String,
-    onCambiarIcono: (String) -> Unit,
+    onElegirFondo: () -> Unit,
+    onQuitarFondo: () -> Unit,
     onVolver: () -> Unit,
     onExportar: () -> Unit,
     onRestaurar: (Uri) -> Unit,
@@ -84,12 +88,20 @@ fun PantallaAjustes(
     var restaurando by remember { mutableStateOf(false) }
     var confirmandoRestaurar by remember { mutableStateOf<Uri?>(null) }
 
+    // Qué color se está editando (si hay alguno abierto).
+    var editor by remember { mutableStateOf<EditorAbierto?>(null) }
+    // La explicación que se está mostrando (aparece al apretar y soltar).
+    var explicacion by remember { mutableStateOf<Explicacion?>(null) }
+
+    val tema = TemaActual.tema
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             // El fondo se pinta acá: si la pantalla se abre sola (o en las
             // capturas) no puede quedar el fondo del sistema detrás.
-            .background(Fondo)
+            // Con una foto o un degradado de fondo, deja transparentarse.
+            .background(if (AparienciaActual.hayFondo) Color.Transparent else Fondo)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp)
     ) {
@@ -131,52 +143,369 @@ fun PantallaAjustes(
         // ------------------------------------------------------------------
         TituloSeccion("Apariencia")
 
-        Text(
-            text = "Tocá un tema y la app se repinta al instante.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = TextoSecundario
-        )
+        // --- 1.1 Los temas de fábrica -------------------------------
+        SeccionPlegable(
+            titulo = "Temas",
+            subtitulo = "Los ${temas.size} temas de fábrica. Tocá uno y la app se repinta al instante.",
+            inicialmenteAbierta = true,
+            onExplicacion = {
+                explicacion = Explicacion(
+                    "Los temas de fábrica",
+                    "Cada tema es una paleta completa: fondo, tarjetas, textos y los " +
+                        "colores de las gráficas. Los siete están medidos contra WCAG " +
+                        "2.2 AA, así que los textos se leen en todos.\n\n" +
+                        "El tema que elijas es el punto de partida: si después " +
+                        "personalizás los colores, esos cambios se quedan y el resto " +
+                        "sigue saliendo del tema."
+                )
+            }
+        ) {
+            temas.forEachIndexed { indice, item ->
+                if (indice > 0) Spacer(Modifier.height(8.dp))
+                FilaTema(
+                    tema = item,
+                    esActual = item.id == temaActualId,
+                    onClick = { onCambiarTema(item.id) }
+                )
+            }
+        }
 
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(10.dp))
 
-        temas.forEachIndexed { indice, tema ->
-            if (indice > 0) Spacer(Modifier.height(8.dp))
-            FilaTema(
-                tema = tema,
-                esActual = tema.id == temaActualId,
-                onClick = { onCambiarTema(tema.id) }
-            )
+        // --- 1.2 El tema personalizado -------------------------------
+        SeccionPlegable(
+            titulo = "Tema personalizado",
+            subtitulo = "Los colores, el fondo y las animaciones, a tu gusto."
+        ) {
+            // --- Colores ----------------------------------------------
+            SeccionPlegable(
+                titulo = "Colores",
+                subtitulo = "La paleta de la app y la de los textos."
+            ) {
+                SubtituloAjuste("Paleta de la app")
+
+                ColorTema.entries.forEach { slot ->
+                    val colorActual = tema.colorDe(slot)
+                    val propio = TemaActual.paleta.colorTema(slot)
+                    Spacer(Modifier.height(6.dp))
+                    MuestraColor(
+                        color = colorActual,
+                        etiqueta = slot.etiqueta,
+                        descripcion = slot.descripcion,
+                        esPersonalizado = propio != null,
+                        // Los colores que SON el fondo no se comparan con el
+                        // fondo: el aviso "casi igual al fondo" no diría nada
+                        // útil ahí, solo molestaría.
+                        avisaSiEsInvisible = slot !in COLORES_DE_FONDO,
+                        onClick = {
+                            editor = EditorAbierto(
+                                titulo = slot.etiqueta,
+                                inicial = colorActual,
+                                alCambiar = { nuevo ->
+                                    TemaActual.paleta = TemaActual.paleta.conTema(slot, nuevo)
+                                }
+                            )
+                        },
+                        onRestablecer = if (propio != null) {
+                            {
+                                TemaActual.paleta = TemaActual.paleta.conTema(slot, null)
+                            }
+                        } else {
+                            null
+                        }
+                    )
+                }
+
+                Spacer(Modifier.height(10.dp))
+                SubtituloAjuste("Paleta de los textos")
+
+                ColorTexto.entries.forEach { slot ->
+                    val colorActual = tema.colorDe(slot)
+                    val propio = TemaActual.paleta.colorTexto(slot)
+                    Spacer(Modifier.height(6.dp))
+                    MuestraColor(
+                        color = colorActual,
+                        etiqueta = slot.etiqueta,
+                        descripcion = slot.descripcion,
+                        esPersonalizado = propio != null,
+                        onClick = {
+                            editor = EditorAbierto(
+                                titulo = slot.etiqueta,
+                                inicial = colorActual,
+                                alCambiar = { nuevo ->
+                                    TemaActual.paleta = TemaActual.paleta.conTexto(slot, nuevo)
+                                }
+                            )
+                        },
+                        onRestablecer = if (propio != null) {
+                            {
+                                TemaActual.paleta = TemaActual.paleta.conTexto(slot, null)
+                            }
+                        } else {
+                            null
+                        }
+                    )
+                }
+
+                if (!TemaActual.paleta.vacia) {
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedButton(
+                        onClick = {
+                            TemaActual.paleta = PaletaPersonalizada.VACIA
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Delete,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Text("Volver los colores del tema")
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(10.dp))
+
+            // --- El fondo ----------------------------------------------
+            SeccionPlegable(
+                titulo = "Fondo",
+                subtitulo = "Una foto del teléfono o un degradado que se mueve."
+            ) {
+                SubtituloAjuste("Imagen del dispositivo")
+
+                VistaPreviaFondo(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(120.dp)
+                        .clip(RoundedCornerShape(RadioBoton))
+                )
+
+                Spacer(Modifier.height(10.dp))
+
+                Text(
+                    text = "Se recomienda una imagen de ${FondosApp.RESOLUCION_RECOMENDADA.first} × " +
+                        "${FondosApp.RESOLUCION_RECOMENDADA.second} px. Si la tuya es más " +
+                        "grande, la app la reescala para que se vea bien y no pese tanto. " +
+                        "La imagen se copia adentro de la app: no se toca la de tu galería.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextoSecundario
+                )
+
+                Spacer(Modifier.height(10.dp))
+
+                if (AparienciaActual.fondo.imagen == null) {
+                    Button(
+                        onClick = onElegirFondo,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(RadioBoton),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = AcentoCalido,
+                            contentColor = Fondo
+                        )
+                    ) {
+                        Text("Elegir una imagen")
+                    }
+                } else {
+                    Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = onElegirFondo,
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(RadioBoton),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = AcentoCalido,
+                                contentColor = Fondo
+                            )
+                        ) {
+                            Text("Cambiarla")
+                        }
+                        OutlinedButton(
+                            onClick = onQuitarFondo,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Quitar")
+                        }
+                    }
+                }
+
+                if (AparienciaActual.fondo.imagen != null) {
+                    Spacer(Modifier.height(14.dp))
+
+                    FilaDeslizador(
+                        titulo = "Opacidad",
+                        valor = AparienciaActual.fondo.opacidadImagen,
+                        textoValor = "${(AparienciaActual.fondo.opacidadImagen * 100).toInt()}%",
+                        onCambio = { nuevo ->
+                            AparienciaActual.fondo = AparienciaActual.fondo.copy(opacidadImagen = nuevo)
+                        }
+                    )
+
+                    FilaDeslizador(
+                        titulo = "Difuminado",
+                        valor = AparienciaActual.fondo.difuminadoImagen,
+                        textoValor = "${(AparienciaActual.fondo.difuminadoImagen * 100).toInt()}%",
+                        onCambio = { nuevo ->
+                            AparienciaActual.fondo = AparienciaActual.fondo.copy(difuminadoImagen = nuevo)
+                        }
+                    )
+                }
+
+                Spacer(Modifier.height(6.dp))
+                SubtituloAjuste("Fondo animado")
+
+                FilaInterruptor(
+                    titulo = "Degradado animado",
+                    descripcion = "Un fondo de colores que se mueve despacio.",
+                    valor = AparienciaActual.fondo.degradadoActivo,
+                    onCambio = { nuevo ->
+                        AparienciaActual.fondo = AparienciaActual.fondo.copy(degradadoActivo = nuevo)
+                    }
+                )
+
+                if (AparienciaActual.fondo.degradadoActivo) {
+                    Spacer(Modifier.height(10.dp))
+
+                    FilaOpciones(
+                        opciones = FormaDegradado.entries,
+                        seleccionada = AparienciaActual.formaDegradado,
+                        etiqueta = { it.etiqueta },
+                        onElegir = { nuevo ->
+                            AparienciaActual.fondo = AparienciaActual.fondo.copy(formaDegradado = nuevo.id)
+                        },
+                        onExplicacion = { nuevo ->
+                            explicacion = Explicacion(nuevo.etiqueta, nuevo.explicacion)
+                        }
+                    )
+
+                    Spacer(Modifier.height(10.dp))
+
+                    FilaDeslizador(
+                        titulo = "Opacidad",
+                        valor = AparienciaActual.fondo.opacidadDegradado,
+                        textoValor = "${(AparienciaActual.fondo.opacidadDegradado * 100).toInt()}%",
+                        onCambio = { nuevo ->
+                            AparienciaActual.fondo = AparienciaActual.fondo.copy(opacidadDegradado = nuevo)
+                        }
+                    )
+
+                    FilaDeslizador(
+                        titulo = "Velocidad",
+                        valor = normalizarVelocidad(AparienciaActual.fondo.velocidadDegradado),
+                        textoValor = "${AparienciaActual.fondo.velocidadDegradado}x",
+                        onCambio = { nuevo ->
+                            AparienciaActual.fondo =
+                                AparienciaActual.fondo.copy(velocidadDegradado = nuevo)
+                        },
+                        minimo = 0.25f,
+                        maximo = 3f
+                    )
+
+                    FilaDeslizador(
+                        titulo = "Intensidad",
+                        valor = AparienciaActual.fondo.intensidadDegradado,
+                        textoValor = "${(AparienciaActual.fondo.intensidadDegradado * 100).toInt()}%",
+                        onCambio = { nuevo ->
+                            AparienciaActual.fondo =
+                                AparienciaActual.fondo.copy(intensidadDegradado = nuevo)
+                        }
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(10.dp))
+
+            // --- Las animaciones --------------------------------------
+            SeccionPlegable(
+                titulo = "Animaciones",
+                subtitulo = "Cómo se mueven las gráficas, los números y la app."
+            ) {
+                FilaInterruptor(
+                    titulo = "Animaciones",
+                    descripcion = "Apagadas, la app se ve quieta: sin conteos, sin movimiento.",
+                    valor = AparienciaActual.animaciones.activas,
+                    onCambio = { nuevo ->
+                        AparienciaActual.animaciones = AparienciaActual.animaciones.copy(activas = nuevo)
+                    }
+                )
+
+                if (AparienciaActual.animaciones.activas) {
+                    Spacer(Modifier.height(12.dp))
+
+                    FilaDeslizador(
+                        titulo = "Velocidad",
+                        valor = normalizarVelocidad(AparienciaActual.animaciones.velocidad),
+                        textoValor = velocidadATexto(AparienciaActual.animaciones.velocidad),
+                        onCambio = { nuevo ->
+                            AparienciaActual.animaciones =
+                                AparienciaActual.animaciones.copy(velocidad = nuevo)
+                        },
+                        minimo = 0.25f,
+                        maximo = 3f
+                    )
+
+                    Spacer(Modifier.height(6.dp))
+                    SubtituloAjuste("Las gráficas")
+
+                    FilaOpciones(
+                        opciones = EstiloGraficas.entries,
+                        seleccionada = EstiloGraficas.porId(AparienciaActual.animaciones.graficas),
+                        etiqueta = { it.etiqueta },
+                        onElegir = { nuevo ->
+                            AparienciaActual.animaciones =
+                                AparienciaActual.animaciones.copy(graficas = nuevo.id)
+                        },
+                        onExplicacion = { nuevo ->
+                            explicacion = Explicacion(nuevo.etiqueta, nuevo.explicacion)
+                        }
+                    )
+
+                    Spacer(Modifier.height(12.dp))
+                    SubtituloAjuste("Los números")
+
+                    FilaOpciones(
+                        opciones = EstiloNumeros.entries,
+                        seleccionada = EstiloNumeros.porId(AparienciaActual.animaciones.numeros),
+                        etiqueta = { it.etiqueta },
+                        onElegir = { nuevo ->
+                            AparienciaActual.animaciones =
+                                AparienciaActual.animaciones.copy(numeros = nuevo.id)
+                        },
+                        onExplicacion = { nuevo ->
+                            explicacion = Explicacion(nuevo.etiqueta, nuevo.explicacion)
+                        }
+                    )
+
+                    Spacer(Modifier.height(12.dp))
+                    SubtituloAjuste("La interfaz")
+
+                    FilaOpciones(
+                        opciones = EstiloInterfaz.entries,
+                        seleccionada = EstiloInterfaz.porId(AparienciaActual.animaciones.interfaz),
+                        etiqueta = { it.etiqueta },
+                        onElegir = { nuevo ->
+                            AparienciaActual.animaciones =
+                                AparienciaActual.animaciones.copy(interfaz = nuevo.id)
+                        },
+                        onExplicacion = { nuevo ->
+                            explicacion = Explicacion(nuevo.etiqueta, nuevo.explicacion)
+                        }
+                    )
+
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        text = "Apretá y soltá una opción para saber qué hace.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextoSecundario
+                    )
+                }
+            }
         }
 
         Spacer(Modifier.height(18.dp))
 
         // ------------------------------------------------------------------
-        // 2. Icono de la app
-        // ------------------------------------------------------------------
-        TituloSeccion("Icono de la app")
-
-        Text(
-            text = "Elegí con qué logo aparece Aura en la pantalla de tu teléfono. " +
-                "Algunos launchers tardan un par de segundos en cambiarlo.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = TextoSecundario
-        )
-
-        Spacer(Modifier.height(12.dp))
-
-        CatalogoIconos.lista.forEachIndexed { indice, icono ->
-            if (indice > 0) Spacer(Modifier.height(8.dp))
-            FilaIcono(
-                icono = icono,
-                esActual = icono.id == iconoActualId,
-                onClick = { onCambiarIcono(icono.id) }
-            )
-        }
-
-        Spacer(Modifier.height(18.dp))
-
-        // ------------------------------------------------------------------
-        // 3. Copia de seguridad
+        // 2. Copia de seguridad
         // ------------------------------------------------------------------
         TituloSeccion("Copia de seguridad")
 
@@ -252,7 +581,7 @@ fun PantallaAjustes(
         }
 
         // ------------------------------------------------------------------
-        // 4. Acerca de (aquí viven también los datos de la app)
+        // 3. Acerca de (aquí viven también los datos de la app)
         // ------------------------------------------------------------------
         Spacer(Modifier.height(18.dp))
         TituloSeccion("Acerca de")
@@ -321,7 +650,64 @@ fun PantallaAjustes(
             onCerrar = { confirmandoRestaurar = null }
         )
     }
+
+    // El editor de color (sale cuando se toca una muestra).
+    editor?.let { abierto ->
+        DialogoEditorColor(
+            colorInicial = abierto.inicial,
+            titulo = abierto.titulo,
+            onCambio = abierto.alCambiar,
+            onCerrar = { editor = null }
+        )
+    }
+
+    // La explicación de una opción (sale al apretar y soltar un chip).
+    explicacion?.let { texto ->
+        DialogoExplicacion(
+            titulo = texto.titulo,
+            texto = texto.texto,
+            onCerrar = { explicacion = null }
+        )
+    }
 }
+
+/** El editor de color que está abierto. */
+private data class EditorAbierto(
+    val titulo: String,
+    val inicial: Color,
+    val alCambiar: (Color) -> Unit
+)
+
+/**
+ * Los colores que SON el fondo de la app.
+ *
+ * Con estos no se avisa "casi igual al fondo": el aviso compararía el color
+ * consigo mismo y siempre saltaría.
+ */
+private val COLORES_DE_FONDO = setOf(
+    ColorTema.FONDO,
+    ColorTema.SUPERFICIE,
+    ColorTema.SUPERFICIE_ALTA,
+    ColorTema.SUPERFICIE_MAXIMA
+)
+
+/** La explicación que se está mostrando. */
+private data class Explicacion(val titulo: String, val texto: String)
+
+/**
+ * La velocidad de las animaciones, en texto.
+ *
+ * La de 1.0 es la "normal": más alta, más rápido; más baja, más lento.
+ */
+private fun velocidadATexto(velocidad: Float): String = when {
+    velocidad < 0.75f -> "Lenta (${velocidad}x)"
+    velocidad < 1.25f -> "Normal (${velocidad}x)"
+    velocidad < 2f -> "Rápida (${velocidad}x)"
+    else -> "Muy rápida (${velocidad}x)"
+}
+
+/** La velocidad del degradado, que va de 0.25 a 3. */
+private fun normalizarVelocidad(velocidad: Float): Float = velocidad.coerceIn(0.25f, 3f)
 
 /**
  * Una fila del selector de temas: la mini-vista previa, el nombre, la
@@ -379,68 +765,6 @@ private fun FilaTema(
 }
 
 /**
- * Una fila del selector de íconos: el logo (tal cual se ve en el launcher),
- * el nombre, la descripción y el check del que está puesto.
- */
-@Composable
-private fun FilaIcono(
-    icono: IconoApp,
-    esActual: Boolean,
-    onClick: () -> Unit
-) {
-    val forma = RoundedCornerShape(RadioBoton)
-    Surface(
-        color = if (esActual) SuperficieAlta else Superficie,
-        shape = forma,
-        border = BorderStroke(
-            width = if (esActual) 1.5.dp else 1.dp,
-            color = if (esActual) AcentoCalido else Borde
-        ),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(forma)
-            .clickable(onClick = onClick)
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Image(
-                painter = painterResource(icono.recurso),
-                contentDescription = null,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier
-                    .size(52.dp)
-                    .clip(RoundedCornerShape(14.dp))
-            )
-            Spacer(Modifier.width(14.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = icono.nombre,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = TextoPrimario
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = icono.descripcion,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextoSecundario
-                )
-            }
-            if (esActual) {
-                Spacer(Modifier.width(10.dp))
-                Icon(
-                    imageVector = Icons.Filled.Check,
-                    contentDescription = "Icono activo",
-                    tint = AcentoCalido,
-                    modifier = Modifier.size(22.dp)
-                )
-            }
-        }
-    }
-}
-
-/**
  * La mini-vista previa de un tema: un rectángulo con el fondo del tema, una
  * barrita de texto y un botón con su color de acento.
  *
@@ -489,24 +813,6 @@ private fun VistaPreviaTema(tema: TemaVisual, modifier: Modifier = Modifier) {
             topLeft = Offset(margen + 7.dp.toPx(), size.height - margen - 15.dp.toPx()),
             size = Size(size.width * 0.36f, 9.dp.toPx()),
             cornerRadius = CornerRadius(4.dp.toPx())
-        )
-    }
-}
-
-/** Una fila de "etiqueta: valor". */
-@Composable
-private fun FilaDato(etiqueta: String, valor: String, colorValor: Color) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            text = etiqueta,
-            style = MaterialTheme.typography.bodyMedium,
-            color = TextoSecundario,
-            modifier = Modifier.weight(1f)
-        )
-        Text(
-            text = valor,
-            style = MaterialTheme.typography.titleSmall,
-            color = colorValor
         )
     }
 }
