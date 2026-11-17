@@ -7,6 +7,8 @@ import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cesar.ahorros.ui.CatalogoTemas
@@ -163,6 +165,15 @@ class CapturaTemasTest {
             }
         }
         composeTestRule.waitForIdle()
+
+        // La sección de temas viene cerrada: hay que abrirla para que se vean
+        // los temas (y para que la captura sea del tema que se pidió).
+        try {
+            composeTestRule.onNodeWithText("Temas").performScrollTo().performClick()
+            composeTestRule.waitForIdle()
+        } catch (e: Exception) {
+            println("CAPTURA no se pudo abrir la sección de temas: ${e.message}")
+        }
     }
 
     /**

@@ -258,6 +258,38 @@ class CapturaNuevasPantallasTest {
         guardar("09b-ajustes-colores.png", capturarPantalla())
     }
 
+    @Test
+    fun `09d ajustes con las animaciones abiertas`() {
+        composeTestRule.setContent {
+            TemaAhorros {
+                PantallaAjustes(
+                    versionApp = "1.14",
+                    temas = CatalogoTemas.todos,
+                    temaActualId = "clasico",
+                    onCambiarTema = { },
+                    onElegirFondo = { },
+                    onQuitarFondo = { },
+                    onVolver = { },
+                    onExportar = { },
+                    onRestaurar = { },
+                    onCerrar = { }
+                )
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithText("Tema personalizado").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("Animaciones").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+
+        // Las tres filas de opciones (gráficas, números e interfaz).
+        composeTestRule.onNodeWithText("Crecer").assertExists()
+        composeTestRule.onNodeWithText("Contar").assertExists()
+        composeTestRule.onNodeWithText("Asentar").assertExists()
+        guardar("09d-ajustes-animaciones.png", capturarPantalla())
+    }
+
     // =====================================================================
     // La lista que viene con la app (la del salón del 11G) también se borra
     // =====================================================================

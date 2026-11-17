@@ -65,7 +65,7 @@ import java.time.LocalDate
 /**
  * Detalle de una deuda: cómo está repartida y qué pagos lleva.
  *
- * La cuota sale de la DEUDA, no de la lista:
+ * La cuota sale de la DEUDA:
  * - En modo [ModoDeuda.META] (César sabe el costo), la cuota normal es
  *   (meta − montos especiales) ÷ (personas que pagan − los de monto
  *   especial): el monto especial **redistribuye** y los demás suben un poco
@@ -76,9 +76,13 @@ import java.time.LocalDate
  * - En modo [ModoDeuda.LIBRE] (César sabe cuánto cobra a cada uno), el monto
  *   de cada uno no se redistribuye: lo que cambia es el total.
  *
- * La lista de personas NO divide nada: es a quién se le está cobrando. Lo que
- * cada uno ya pagó no se toca nunca: lo que falta es su cuota menos lo
- * pagado. Si alguien pagó de más, el excedente queda a favor.
+ * Y si César NO dijo cuántos van a pagar (cuota automática), los que pagan
+ * son los de la lista: la cuota sale de la gente que se fue añadiendo.
+ *
+ * La lista de personas NO divide nada (salvo en la cuota automática): es a
+ * quién se le está cobrando. Lo que cada uno ya pagó no se toca nunca: lo que
+ * falta es su cuota menos lo pagado. Si alguien pagó de más, el excedente
+ * queda a favor.
  *
  * "Saldada" solo se marca a mano con el botón, nunca sola.
  *
@@ -105,6 +109,9 @@ fun PantallaDeudaDetalle(
     val grupos = CalculosDeudas.pagosPorDia(deuda)
     val montoBase = CalculosDeudas.montoBaseDe(deuda)
     val notaRedistribucion = textoRedistribucion(deuda)
+    // Cuota automática: no se dijo cuántos pagan, así que la cuota sale de la
+    // gente de la lista.
+    val automatica = CalculosDeudas.esAutomatica(deuda)
     val nombrePorId = remember(deuda.personas) { deuda.personas.associateBy { it.id } }
 
     LazyColumn(
@@ -225,6 +232,9 @@ fun PantallaDeudaDetalle(
         // KPIs
         // ------------------------------------------------------------------
         item(key = "kpis") {
+            // Cuántos pagan ahora mismo: el número puesto a mano o, si no se
+            // dijo, la gente de la lista.
+            val pagadores = CalculosDeudas.pagadoresDe(deuda)
             Row(modifier = Modifier.fillMaxWidth()) {
                 // Si la deuda está marcada a mano como saldada, no hay nada que
                 // cobrar: se muestra cerrada y no se habla de quién debe.
@@ -246,14 +256,22 @@ fun PantallaDeudaDetalle(
                         valor = montoBase.dineroSimbolo(),
                         colorValor = AcentoCalido,
                         pie = if (deuda.modo == ModoDeuda.META) {
-                            if (deuda.cuotaPersonalizada != null) {
-                                // Con cuota a mano no se divide: el total a
-                                // cobrar sale de multiplicarla por la gente.
-                                "cuota fija · total a cobrar " +
-                                    CalculosDeudas.totalDe(deuda).dineroSimbolo()
-                            } else {
-                                "total ÷ ${deuda.personasQuePagan} " +
-                                    (if (deuda.personasQuePagan == 1) "persona" else "personas")
+                            when {
+                                deuda.cuotaPersonalizada != null -> {
+                                    // Con cuota a mano no se divide: el total a
+                                    // cobrar sale de multiplicarla por la gente.
+                                    "cuota fija · total a cobrar " +
+                                        CalculosDeudas.totalDe(deuda).dineroSimbolo()
+                                }
+                                // Cuota automática: la cuota sale de la gente de
+                                // la lista, no de un número puesto a mano.
+                                automatica -> if (deuda.personas.isEmpty()) {
+                                    "se calcula al añadir gente"
+                                } else {
+                                    "se calcula con los ${deuda.personas.size} de la lista"
+                                }
+                                else -> "total ÷ $pagadores " +
+                                    (if (pagadores == 1) "persona" else "personas")
                             }
                         } else {
                             "monto fijo"

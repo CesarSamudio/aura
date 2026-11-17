@@ -55,15 +55,17 @@ fun TarjetaKpi(
     colorValor: Color,
     pie: String? = null,
     modifier: Modifier = Modifier,
-    valorAnimado: Double? = null
+    valorAnimado: Double? = null,
+    clave: Any? = null
 ) {
     val numero = rememberNumeroAnimado(valorAnimado ?: 0.0)
     val texto = if (valorAnimado != null) numero.value.dineroSimbolo() else valor
 
     // La entrada de la tarjeta: el patrón "asentamiento con resorte" cuando
     // el usuario elige "Asentar", un deslizamiento corto cuando elige
-    // "Deslizar" y un simple fundido cuando elige "Fundido".
-    val entrada = progresoDeEntrada()
+    // "Deslizar" y un simple fundido cuando elige "Fundido". La clave
+    // reinicia la entrada cuando cambian los datos.
+    val entrada = progresoDeEntrada(clave)
     val estilo = AparienciaActual.estiloInterfaz
 
     Card(

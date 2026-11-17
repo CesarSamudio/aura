@@ -13,10 +13,10 @@ Hay dos versiones de la misma app. La diferencia es **una sola lista de 24 nombr
 
 | Versión | Para quién | Archivo |
 |---|---|---|
-| **Aura v1.14** | Cualquiera | [`apk/Aura-v1.14.apk`](apk/Aura-v1.14.apk) |
-| **Aura 11G v1.14** | Los del 11G: trae la lista del salón ya escrita | [`apk/Aura-v1.14-11G.apk`](apk/Aura-v1.14-11G.apk) |
+| **Aura v1.15** | Cualquiera | [`apk/Aura-v1.15.apk`](apk/Aura-v1.15.apk) |
+| **Aura 11G v1.15** | Los del 11G: trae la lista del salón ya escrita | [`apk/Aura-v1.15-11G.apk`](apk/Aura-v1.15-11G.apk) |
 
-> **Instalá `Aura-v1.14.apk` si no sos del 11G.**
+> **Instalá `Aura-v1.15.apk` si no sos del 11G.**
 > La del 11G es EXACTAMENTE la misma app con la lista del salón escrita de antemano
 > (para no tener que teclear los 24 nombres). Además instala con otro paquete, así que
 > las dos conviven en el mismo teléfono sin pisarse.
@@ -24,13 +24,15 @@ Hay dos versiones de la misma app. La diferencia es **una sola lista de 24 nombr
 Para instalar: copiá el `.apk` al teléfono y abrilo. Android va a pedir permiso para
 instalar apps de fuentes desconocidas: es normal, es el aviso de siempre.
 
-Si preferís bajarlo de GitHub, los mismos `.apk` están en la [release v1.14](https://github.com/CesarSamudio/aura/releases/tag/v1.14).
+Si preferís bajarlo de GitHub, los mismos `.apk` están en la [release v1.15](https://github.com/CesarSamudio/aura/releases/tag/v1.15).
 
 ## Qué hace
 
 - **Ahorros y gastos**: cuánto entró, cuánto salió, y el balance del día.
 - **Deudas**: armás la deuda, decidís cuántos la pagan, y le vas marcando a cada
   quién cuánto puso. Con **monto especial** para cuando alguien paga otra cosa.
+  Y si **no sabés cuántos van a pagar**, dejás el campo vacío y la cuota se calcula
+  con la gente que vayas añadiendo.
 - **Pruebas por persona**: adjuntás el screenshot de la transferencia (solo con YAPI)
   y queda guardado con la deuda.
 - **Listas de gente**: creás tus propias listas (un curso, un equipo) y quedan
@@ -41,7 +43,8 @@ Si preferís bajarlo de GitHub, los mismos `.apk` están en la [release v1.14](h
   separado** (la paleta de la app y la de los textos) con un selector de color que
   te dice, en vivo, si ese color se lee o no.
 - **Fondo con tu foto**: se elige una imagen del teléfono (la app la reescala para
-  que se vea bien y no pese tanto) y se le ajusta la opacidad y el difuminado.
+  que se vea bien y no pese tanto) y se le ajusta la opacidad y el difuminado (de
+  verdad, con kernel gaussiano: se ve como el de una lente, no a píxeles).
 - **Fondo animado**: degradados que se mueven (aureola, aurora, barrido, cónico o
   malla), con su opacidad, velocidad e intensidad.
 - **Animaciones a tu medida**: las gráficas, los números y la interfaz se pueden
@@ -99,10 +102,9 @@ Sin la clave, el build compila igual pero el APK sale **sin firmar** (no se pued
 - **MVVM** con `StateFlow`; los datos se guardan en **JSON plano** dentro de la carpeta
   de la app (`movimientos.json`, `deudas.json`, `listas.json`, `ajustes.json`).
 - **Sin base de datos**: para este volumen es instantáneo y no pesa nada en el APK.
-- **204 tests** en verde (234 con las capturas), entre ellos uno que mide el
+- **228 tests** en verde (259 con las capturas), entre ellos uno que mide el
   **contraste de color de los 7 temas contra WCAG 2.2 AA** y otro que mide el
-  contraste de los colores que personaliza el usuario.
-- Las capturas de pantalla de los tests se generan en el PC con **Robolectric**
+  contraste de los colores que personaliza el usuario.- Las capturas de pantalla de los tests se generan en el PC con **Robolectric**
   (gráficos nativos), sin emulador.
 
 ## Las capturas

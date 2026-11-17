@@ -27,6 +27,11 @@ import java.time.LocalDate
  * sale de multiplicarla por la gente. El costo real se conserva aparte: no
  * se borra, se muestra como dato aparte. Sin cuota personalizada (o sea, en
  * `null`, que es lo normal) nada de esto cambia: se divide como siempre.
+ *
+ * El **número de personas que pagan es opcional**: si César no lo dice (o no
+ * lo sabe), la cuota sale de la gente que se fue añadiendo a la lista. Eso es
+ * lo que hace [pagadoresDe]: devuelve cuántos pagan ahora mismo, y en modo
+ * automático son los que están en la lista.
  */
 object CalculosDeudas {
 
@@ -45,6 +50,35 @@ object CalculosDeudas {
         deuda.personas.count { it.cuotaPropia != null }
 
     /**
+     * Cuántas personas pagan la deuda ahora mismo.
+     *
+     * - Si hay un número a mano ([Deuda.personasQuePagan]), manda ESE número:
+     *   la lista es a quién se le cobra, no quién divide.
+     * - Si NO se dijo (la deuda quedó en automática, o es un archivo viejo sin
+     *   reparar), manda la **gente de la lista**: la cuota sale de los que se
+     *   fueron añadiendo. Por eso no hace falta saber de antemano cuántos
+     *   son: con 60 personas en la lista, la cuota es el total ÷ 60.
+     *
+     * Nunca da cero (si todavía no hay nadie en la lista se cuenta como 1)
+     * para no dividir por cero.
+     */
+    fun pagadoresDe(deuda: Deuda): Int {
+        val declarados = deuda.personasQuePagan
+        return if (declarados != null) declarados else maxOf(1, deuda.personas.size)
+    }
+
+    /**
+     * True si la deuda está en **cuota automática**: la cuota sale de la gente
+     * de la lista porque no se dijo cuántos van a pagar.
+     *
+     * Se pregunta por el número y no por la marca ([Deuda.cuotaAutomatica])
+     * porque el número es lo que el usuario tiene delante: si puso uno, el
+     * número manda. La marca sirve para el archivo (ver
+     * [com.cesar.ahorros.data.RepositorioDeudas]).
+     */
+    fun esAutomatica(deuda: Deuda): Boolean = deuda.personasQuePagan == null
+
+    /**
      * El total real de la deuda.
      * - META: la meta que puso Cesar. Si hay cuota personalizada, el total que
      *   se COBRA es la cuota × la gente (más el ajuste de los montos
@@ -59,7 +93,7 @@ object CalculosDeudas {
                 // Con cuota fija el total a cobrar sale de multiplicar, igual
                 // que en modo libre: el costo real no se reparte.
                 val base = redondear(cuota)
-                val n = deuda.personasQuePagan
+                val n = pagadoresDe(deuda)
                 // Los que tienen monto propio pagan su monto en vez de la base.
                 val ajuste = sumaPropios(deuda) - base * cantidadPropios(deuda)
                 redondear(base * n + ajuste)
@@ -69,7 +103,9 @@ object CalculosDeudas {
         }
         ModoDeuda.LIBRE -> {
             val base = redondear(deuda.montoPorPersona)
-            val n = deuda.personasQuePagan
+            // En modo libre no se divide: el total sale de multiplicar por la
+            // gente. Con la cuota automática, esa gente es la de la lista.
+            val n = pagadoresDe(deuda)
             // Los que tienen monto propio pagan su monto en vez de la base.
             val ajuste = sumaPropios(deuda) - base * cantidadPropios(deuda)
             redondear(base * n + ajuste)
@@ -84,14 +120,21 @@ object CalculosDeudas {
      *   cobra a cada uno y el monto especial de uno NO redistribuye (igual
      *   que en modo libre).
      * - LIBRE: el monto que puso Cesar, sin redistribuir.
+     *
+     * Con la cuota automática (no se dijo cuántos pagan), los que pagan son
+     * los de la lista: si todavía no hay nadie, la cuota es 0 (no hay a quién
+     * cobrarle) y se calcula sola cuando se añada gente.
      */
     fun montoBaseDe(deuda: Deuda): Double = when (deuda.modo) {
         ModoDeuda.META -> {
             val cuota = deuda.cuotaPersonalizada
             if (cuota != null) {
                 redondear(cuota)
+            } else if (esAutomatica(deuda) && deuda.personas.isEmpty()) {
+                // Todavía no hay nadie en la lista: no hay cuota que repartir.
+                0.0
             } else {
-                val restantes = deuda.personasQuePagan - cantidadPropios(deuda)
+                val restantes = pagadoresDe(deuda) - cantidadPropios(deuda)
                 if (restantes <= 0) 0.0 else redondear((deuda.total - sumaPropios(deuda)) / restantes)
             }
         }

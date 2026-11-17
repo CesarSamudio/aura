@@ -51,6 +51,8 @@ import com.cesar.ahorros.dominio.CalculosDeudas
  *
  * En los dos modos, lo que define la cuota es la DEUDA (el número de personas
  * que la pagan), nunca la lista de personas: la lista es a quién se le cobra.
+ * La excepción es la **cuota automática**: si no se dijo cuántos van a pagar,
+ * los que pagan son justamente los de la lista.
  *
  * El total que se muestra arriba es lo que le deben a Cesar ahora mismo: la
  * suma del saldo de las deudas que todavía NO están saldadas. Las saldadas se
@@ -268,15 +270,37 @@ internal fun textoTotalDeuda(deuda: Deuda): String {
  * Con cuota personalizada (modo META) la cuota es la que puso César, así que
  * la línea dice lo mismo de siempre: solo cambia de dónde sale el número.
  *
+ * Con **cuota automática** (no se dijo cuántos van a pagar) los que pagan son
+ * los de la lista, así que la línea lo dice: "La cuota sale de los 4 que
+ * están en la lista · $25,00 cada uno".
+ *
  * Si la deuda está marcada a mano como saldada, se le quita el "deben
  * pagarlo": la deuda está cerrada y no se contradice el estado verde.
  */
 internal fun textoRepartoDeuda(deuda: Deuda): String {
-    val personas = deuda.personasQuePagan
-    if (personas <= 0) return "Falta decir cuántas personas lo pagan"
-
+    // Cuántos pagan ahora mismo: el número puesto a mano o, si no se dijo,
+    // la gente de la lista.
+    val personas = CalculosDeudas.pagadoresDe(deuda)
     val base = CalculosDeudas.montoBaseDe(deuda).dineroSimbolo()
     val total = CalculosDeudas.totalDe(deuda).dineroSimbolo()
+
+    // Cuota automática: la cuota sale de la lista, no de un número a mano.
+    if (CalculosDeudas.esAutomatica(deuda)) {
+        val enLista = deuda.personas.size
+        return when {
+            enLista == 0 ->
+                "Todavía no hay nadie en la lista: la cuota se calcula al añadir gente"
+            // Con cuota a mano la cuota no se divide: lo que sale de la lista
+            // es el total a cobrar.
+            deuda.cuotaPersonalizada != null ->
+                "$enLista personas · $base cada uno · total $total"
+            deuda.modo == ModoDeuda.LIBRE ->
+                "El total sale de los $enLista que están en la lista · $base cada uno · total $total"
+            else -> "La cuota sale de los $enLista que están en la lista · $base cada uno"
+        }
+    }
+
+    if (personas <= 0) return "Falta decir cuántas personas lo pagan"
 
     return when {
         // Deuda cerrada a mano: sin "deben pagarlo".

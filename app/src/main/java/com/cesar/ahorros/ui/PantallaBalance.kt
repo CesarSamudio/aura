@@ -54,7 +54,10 @@ enum class Periodo(val etiqueta: String, val dias: Int) {
  */
 @Composable
 fun PantallaBalance(movimientos: List<Movimiento>, onAjustes: () -> Unit) {
-    var periodo by remember { mutableStateOf(Periodo.MES) }
+    // El periodo con el que se abre el Balance: 7 días. Lo que la persona
+    // mira casi siempre es "cómo venía la semana", y además son las gráficas
+    // más legibles (7 barras, no 30).
+    var periodo by remember { mutableStateOf(Periodo.SEMANA) }
 
     val totalAhorros = remember(movimientos) {
         movimientos.filter { it.tipo == Tipo.AHORRO }.sumOf { it.monto }
@@ -76,8 +79,9 @@ fun PantallaBalance(movimientos: List<Movimiento>, onAjustes: () -> Unit) {
     val puntosBarra = remember(enPeriodo, periodo) { construirBarras(enPeriodo, periodo) }
     val acumulado = remember(enPeriodo, periodo) { construirAcumulado(enPeriodo, periodo) }
     // La paleta de la dona depende del tema: si cambia, hay que volver a
-    // construirla (por eso el id del tema entra en la clave del remember).
-    val porCategoria = remember(enPeriodo, TemaActual.tema.id) { construirCategorias(enPeriodo) }
+    // construirla (por eso la clave del tema entra en el remember: la clave
+    // incluye los colores que el usuario personalizó, no solo el tema).
+    val porCategoria = remember(enPeriodo, TemaActual.clave) { construirCategorias(enPeriodo) }
     val resumenTabla = remember(enPeriodo) { construirResumen(enPeriodo) }
 
     LazyColumn(
@@ -129,7 +133,8 @@ fun PantallaBalance(movimientos: List<Movimiento>, onAjustes: () -> Unit) {
                     colorValor = AcentoMenta,
                     pie = "depositado",
                     modifier = Modifier.weight(1f),
-                    valorAnimado = totalAhorros
+                    valorAnimado = totalAhorros,
+                    clave = periodo
                 )
                 TarjetaKpi(
                     titulo = "Gastos",
@@ -137,7 +142,8 @@ fun PantallaBalance(movimientos: List<Movimiento>, onAjustes: () -> Unit) {
                     colorValor = ColorGasto,
                     pie = "consumido",
                     modifier = Modifier.weight(1f),
-                    valorAnimado = totalGastos
+                    valorAnimado = totalGastos,
+                    clave = periodo
                 )
             }
         }
@@ -155,8 +161,8 @@ fun PantallaBalance(movimientos: List<Movimiento>, onAjustes: () -> Unit) {
         }
 
         item(key = "grafica-barras") {
-            TarjetaPanel(titulo = "Ahorros vs gastos · ${periodo.etiqueta}") {
-                GraficaBarras(puntos = puntosBarra, modifier = Modifier.fillMaxWidth())
+            TarjetaPanel(titulo = "Ahorros vs gastos · ${periodo.etiqueta}", clave = periodo) {
+                GraficaBarras(puntos = puntosBarra, clave = periodo, modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(10.dp))
                 LeyendaGrafica(
                     elementos = listOf(
@@ -168,13 +174,13 @@ fun PantallaBalance(movimientos: List<Movimiento>, onAjustes: () -> Unit) {
         }
 
         item(key = "grafica-area") {
-            TarjetaPanel(titulo = "Balance acumulado") {
-                GraficaArea(valores = acumulado, modifier = Modifier.fillMaxWidth())
+            TarjetaPanel(titulo = "Balance acumulado", clave = periodo) {
+                GraficaArea(valores = acumulado, clave = periodo, modifier = Modifier.fillMaxWidth())
             }
         }
 
         item(key = "grafica-dona") {
-            TarjetaPanel(titulo = "Gastos por categoría") {
+            TarjetaPanel(titulo = "Gastos por categoría", clave = periodo) {
                 if (porCategoria.isEmpty()) {
                     Text(
                         text = "Sin gastos registrados en este periodo.",
@@ -185,6 +191,7 @@ fun PantallaBalance(movimientos: List<Movimiento>, onAjustes: () -> Unit) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         GraficaDona(
                             puntos = porCategoria,
+                            clave = periodo,
                             modifier = Modifier.size(116.dp)
                         )
                         Spacer(Modifier.width(12.dp))
@@ -198,7 +205,7 @@ fun PantallaBalance(movimientos: List<Movimiento>, onAjustes: () -> Unit) {
         }
 
         item(key = "tabla") {
-            TarjetaPanel(titulo = "Detalle por categoría") {
+            TarjetaPanel(titulo = "Detalle por categoría", clave = periodo) {
                 if (resumenTabla.isEmpty()) {
                     Text(
                         text = "Todavía no hay movimientos en este periodo.",
@@ -206,7 +213,7 @@ fun PantallaBalance(movimientos: List<Movimiento>, onAjustes: () -> Unit) {
                         color = TextoSecundario
                     )
                 } else {
-                    TablaResumen(resumenTabla)
+                    TablaResumen(resumenTabla, clave = periodo)
                 }
             }
         }
@@ -296,10 +303,12 @@ private fun construirResumen(movimientos: List<Movimiento>): List<FilaResumen> {
 }
 
 @Composable
-private fun TarjetaPanel(titulo: String, contenido: @Composable () -> Unit) {
+private fun TarjetaPanel(titulo: String, clave: Any? = null, contenido: @Composable () -> Unit) {
     // La entrada del panel: cómo se asienta, se desliza o se funde depende
-    // del estilo que eligió el usuario en Ajustes.
-    val entrada = progresoDeEntrada()
+    // del estilo que eligió el usuario en Ajustes. La clave reinicia la
+    // animación cuando cambian los datos (al cambiar de periodo, el panel se
+    // vuelve a asentar en vez de cambiar de golpe).
+    val entrada = progresoDeEntrada(clave)
     val estilo = AparienciaActual.estiloInterfaz
 
     Card(
@@ -356,7 +365,7 @@ private fun LeyendaGrafica(elementos: List<Triple<String, Color, String>>) {
 }
 
 @Composable
-private fun TablaResumen(filas: List<FilaResumen>) {
+private fun TablaResumen(filas: List<FilaResumen>, clave: Any? = null) {
     Column {
         Row(modifier = Modifier.fillMaxWidth()) {
             Text(
@@ -381,11 +390,18 @@ private fun TablaResumen(filas: List<FilaResumen>) {
             )
         }
         Spacer(Modifier.height(8.dp))
-        filas.forEach { fila ->
+        filas.forEachIndexed { indice, fila ->
             val total = fila.ahorro - fila.gasto
+            // Las filas entran una detrás de otra (escalonado): así se nota
+            // que la tabla cambió y no que saltó de golpe.
+            val entrada = progresoDeFila(indice, clave)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .graphicsLayer {
+                        alpha = entrada
+                        translationX = (1f - entrada) * 24f
+                    }
                     .padding(vertical = 7.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {

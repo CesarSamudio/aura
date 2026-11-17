@@ -74,11 +74,12 @@ class PersistenciaDeudasTest {
         modo: ModoDeuda = ModoDeuda.META,
         total: Double = 30.0,
         montoPorPersona: Double = 0.0,
-        personasQuePagan: Int = 3,
+        personasQuePagan: Int? = 3,
         personas: List<PersonaDeuda> = listOf(persona("p1", "Cesar"), persona("p2", "Ana")),
         pagos: List<Pago> = emptyList(),
         saldada: Boolean = false,
-        cuotaPersonalizada: Double? = null
+        cuotaPersonalizada: Double? = null,
+        cuotaAutomatica: Boolean = personasQuePagan == null
     ) = Deuda(
         id = id,
         nombre = nombre,
@@ -87,6 +88,7 @@ class PersistenciaDeudasTest {
         montoPorPersona = montoPorPersona,
         cuotaPersonalizada = cuotaPersonalizada,
         personasQuePagan = personasQuePagan,
+        cuotaAutomatica = cuotaAutomatica,
         personas = personas,
         pagos = pagos,
         saldada = saldada,
@@ -242,6 +244,112 @@ class PersistenciaDeudasTest {
         // Se repara con la cantidad de personas que había en la lista.
         assertEquals(2, cargados[0].personasQuePagan)
         assertEquals(2, cargados[0].personas.size)
+        // Y queda como una deuda normal (no automática): el número manda.
+        assertFalse(cargados[0].cuotaAutomatica)
+    }
+
+    @Test
+    fun `una deuda en cuota automática se guarda y se vuelve a leer igual`() {
+        // La deuda en la que el usuario NO dijo cuántos van a pagar: el
+        // número va en null y la cuota sale de la lista.
+        val lista = listOf(
+            deuda(
+                "d1", "banner", ModoDeuda.META, 100.0,
+                personasQuePagan = null,
+                personas = listOf(persona("p1", "Cesar"), persona("p2", "Ana"))
+            )
+        )
+
+        repositorio.guardar(lista)
+
+        val cargados = repositorio.cargar()
+        assertEquals(1, cargados.size)
+        assertNull(cargados[0].personasQuePagan)
+        assertTrue(cargados[0].cuotaAutomatica)
+        assertEquals(2, cargados[0].personas.size)
+        // Y es exactamente la misma deuda que se guardó.
+        assertEquals(lista, cargados)
+    }
+
+    @Test
+    fun `una deuda en automática del archivo no se repara al cargar`() {
+        // El archivo dice que el usuario no dijo cuántos pagan: la cuota la
+        // calcula la lista, así que NO se repara con la cantidad de la lista.
+        archivoDeudas().writeText(
+            """
+            [
+              {
+                "id": "d1",
+                "nombre": "banner",
+                "total": 100.0,
+                "personasQuePagan": null,
+                "cuotaAutomatica": true,
+                "personas": [{"id": "p1", "nombre": "Cesar"}],
+                "pagos": [],
+                "saldada": false,
+                "ts": 1700000000000
+              }
+            ]
+            """.trimIndent()
+        )
+
+        val cargados = repositorio.cargar()
+
+        assertEquals(1, cargados.size)
+        assertNull(cargados[0].personasQuePagan)
+        assertTrue(cargados[0].cuotaAutomatica)
+        assertEquals(1, cargados[0].personas.size)
+    }
+
+    @Test
+    fun `una deuda vieja con el numero se lee sin cambios`() {
+        // La versión anterior del modelo ya traía el número (pero no el campo
+        // "cuotaAutomatica"): se lee tal cual, sin repararse.
+        archivoDeudas().writeText(
+            """
+            [
+              {
+                "id": "d1",
+                "nombre": "banner",
+                "total": 42.80,
+                "personasQuePagan": 23,
+                "personas": [{"id": "p1", "nombre": "Cesar"}],
+                "pagos": [],
+                "saldada": false,
+                "ts": 1700000000000
+              }
+            ]
+            """.trimIndent()
+        )
+
+        val cargados = repositorio.cargar()
+
+        assertEquals(1, cargados.size)
+        assertEquals(23, cargados[0].personasQuePagan)
+        assertEquals(42.80, cargados[0].total, 0.0001)
+        // No es automática: el número puesto a mano manda.
+        assertFalse(cargados[0].cuotaAutomatica)
+    }
+
+    @Test
+    fun `al guardar la marca de automática y el numero quedan de acuerdo`() {
+        // Al editar una deuda se copia la anterior y la copia conserva la
+        // marca vieja: por eso, antes de guardar, se deja todo coherente.
+        repositorio.guardar(
+            listOf(
+                // Con número pero marcada como automática: manda el número.
+                deuda("d1", personasQuePagan = 5, cuotaAutomatica = true),
+                // Sin número pero sin la marca: es automática.
+                deuda("d2", personasQuePagan = null, cuotaAutomatica = false)
+            )
+        )
+
+        val cargados = repositorio.cargar()
+        assertEquals(2, cargados.size)
+        assertEquals(5, cargados[0].personasQuePagan)
+        assertFalse(cargados[0].cuotaAutomatica)
+        assertNull(cargados[1].personasQuePagan)
+        assertTrue(cargados[1].cuotaAutomatica)
     }
 
     @Test

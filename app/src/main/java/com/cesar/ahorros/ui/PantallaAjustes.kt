@@ -147,7 +147,7 @@ fun PantallaAjustes(
         SeccionPlegable(
             titulo = "Temas",
             subtitulo = "Los ${temas.size} temas de fábrica. Tocá uno y la app se repinta al instante.",
-            inicialmenteAbierta = true,
+            inicialmenteAbierta = false,
             onExplicacion = {
                 explicacion = Explicacion(
                     "Los temas de fábrica",
@@ -392,10 +392,11 @@ fun PantallaAjustes(
                     FilaDeslizador(
                         titulo = "Velocidad",
                         valor = normalizarVelocidad(AparienciaActual.fondo.velocidadDegradado),
-                        textoValor = "${AparienciaActual.fondo.velocidadDegradado}x",
+                        textoValor = "${numeroATexto(AparienciaActual.fondo.velocidadDegradado)}×",
                         onCambio = { nuevo ->
-                            AparienciaActual.fondo =
-                                AparienciaActual.fondo.copy(velocidadDegradado = nuevo)
+                            AparienciaActual.fondo = AparienciaActual.fondo.copy(
+                                velocidadDegradado = redondearVelocidad(nuevo)
+                            )
                         },
                         minimo = 0.25f,
                         maximo = 3f
@@ -437,8 +438,12 @@ fun PantallaAjustes(
                         valor = normalizarVelocidad(AparienciaActual.animaciones.velocidad),
                         textoValor = velocidadATexto(AparienciaActual.animaciones.velocidad),
                         onCambio = { nuevo ->
-                            AparienciaActual.animaciones =
-                                AparienciaActual.animaciones.copy(velocidad = nuevo)
+                            AparienciaActual.animaciones = AparienciaActual.animaciones.copy(
+                                // Se redondea a dos decimales: el deslizador es
+                                // continuo, pero el número guardado y el que
+                                // se ve tienen que ser legibles.
+                                velocidad = redondearVelocidad(nuevo)
+                            )
                         },
                         minimo = 0.25f,
                         maximo = 3f
@@ -699,15 +704,42 @@ private data class Explicacion(val titulo: String, val texto: String)
  *
  * La de 1.0 es la "normal": más alta, más rápido; más baja, más lento.
  */
-private fun velocidadATexto(velocidad: Float): String = when {
-    velocidad < 0.75f -> "Lenta (${velocidad}x)"
-    velocidad < 1.25f -> "Normal (${velocidad}x)"
-    velocidad < 2f -> "Rápida (${velocidad}x)"
-    else -> "Muy rápida (${velocidad}x)"
+private fun velocidadATexto(velocidad: Float): String {
+    val valor = numeroATexto(velocidad)
+    return when {
+        velocidad < 0.75f -> "Lenta ($valor×)"
+        velocidad < 1.25f -> "Normal ($valor×)"
+        velocidad < 2f -> "Rápida ($valor×)"
+        else -> "Muy rápida ($valor×)"
+    }
+}
+
+/**
+ * Un número con, como mucho, dos decimales y sin ceros de más.
+ *
+ * Sin esto el deslizador mostraba "0.5735294×", que es un número de máquina
+ * y no algo que un humano pueda leer.
+ */
+private fun numeroATexto(valor: Float): String {
+    val redondeado = Math.round(valor * 100.0) / 100.0
+    return if (redondeado == Math.floor(redondeado)) {
+        redondeado.toInt().toString()
+    } else {
+        String.format(java.util.Locale.ROOT, "%.2f", redondeado).trimEnd('0').trimEnd('.')
+    }
 }
 
 /** La velocidad del degradado, que va de 0.25 a 3. */
 private fun normalizarVelocidad(velocidad: Float): Float = velocidad.coerceIn(0.25f, 3f)
+
+/**
+ * La velocidad redondeada a dos decimales.
+ *
+ * El deslizador es continuo, así que sin redondear guardaría cosas como
+ * 0.5735294: un número de máquina, que ni se lee ni sirve de nada.
+ */
+private fun redondearVelocidad(velocidad: Float): Float =
+    (Math.round(velocidad * 100.0) / 100.0).toFloat()
 
 /**
  * Una fila del selector de temas: la mini-vista previa, el nombre, la

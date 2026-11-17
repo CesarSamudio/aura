@@ -62,11 +62,12 @@ class LogicaDeudasTest {
         modo: ModoDeuda = ModoDeuda.META,
         total: Double = 30.0,
         montoPorPersona: Double = 0.0,
-        personasQuePagan: Int = 3,
+        personasQuePagan: Int? = 3,
         personas: List<PersonaDeuda> = listOf(persona("p1", "Cesar"), persona("p2", "Ana")),
         pagos: List<Pago> = emptyList(),
         saldada: Boolean = false,
-        cuotaPersonalizada: Double? = null
+        cuotaPersonalizada: Double? = null,
+        cuotaAutomatica: Boolean = personasQuePagan == null
     ) = Deuda(
         id = id,
         nombre = nombre,
@@ -75,6 +76,7 @@ class LogicaDeudasTest {
         montoPorPersona = montoPorPersona,
         cuotaPersonalizada = cuotaPersonalizada,
         personasQuePagan = personasQuePagan,
+        cuotaAutomatica = cuotaAutomatica,
         personas = personas,
         pagos = pagos,
         saldada = saldada,
@@ -133,6 +135,9 @@ class LogicaDeudasTest {
 
     @Test
     fun `agregar personas a la lista no cambia la cuota`() {
+        // Con el número de pagadores puesto a mano, la lista NO divide: es a
+        // quién se le cobra. (En cuota automática es al revés: ver los tests
+        // de "cuota automática" más abajo.)
         val d = deuda(modo = ModoDeuda.META, total = 30.0, personasQuePagan = 3, personas = listOf(persona("p1", "Cesar")))
         assertEquals(10.0, CalculosDeudas.montoBaseDe(d), centavo)
 
@@ -577,6 +582,125 @@ class LogicaDeudasTest {
     @Test
     fun `el resumen de una persona que no existe es null`() {
         assertEquals(null, CalculosDeudas.resumenPersona(deuda(), "no-existe"))
+    }
+
+    // ------------------------------------------------------------------
+    // Cuota automática: cuando NO se sabe cuántos van a pagar
+    //
+    // El campo "¿cuántas personas lo van a pagar?" es opcional: si queda
+    // vacío, la cuota sale de la gente que se vaya añadiendo a la lista.
+    // ------------------------------------------------------------------
+
+    @Test
+    fun `en automática la cuota sale de la gente de la lista`() {
+        // El caso de Cesar: una deuda de $100 y se van metrese 4 personas.
+        val d = deuda(
+            modo = ModoDeuda.META,
+            total = 100.0,
+            personasQuePagan = null,
+            personas = List(4) { persona("p$it", "Persona $it") }
+        )
+        assertEquals(4, CalculosDeudas.pagadoresDe(d))
+        assertEquals(25.0, CalculosDeudas.montoBaseDe(d), centavo)
+        assertEquals(100.0, CalculosDeudas.totalDe(d), centavo)
+    }
+
+    @Test
+    fun `en automática con mucha gente la cuota se redondea a dos decimales`() {
+        val d = deuda(
+            modo = ModoDeuda.META,
+            total = 100.0,
+            personasQuePagan = null,
+            personas = List(60) { persona("p$it", "Persona $it") }
+        )
+        assertEquals(60, CalculosDeudas.pagadoresDe(d))
+        // 100 ÷ 60 = 1.6666... → $1,67
+        assertEquals(1.67, CalculosDeudas.montoBaseDe(d), centavo)
+    }
+
+    @Test
+    fun `en automática sin nadie en la lista no revienta`() {
+        val d = deuda(
+            modo = ModoDeuda.META,
+            total = 100.0,
+            personasQuePagan = null,
+            personas = emptyList()
+        )
+        // Nadie en la lista: se cuenta como 1 para no dividir por cero.
+        assertEquals(1, CalculosDeudas.pagadoresDe(d))
+        // Y no hay cuota que repartir todavía: 0 (ni NaN ni Infinity).
+        assertEquals(0.0, CalculosDeudas.montoBaseDe(d), centavo)
+        // El total sigue siendo el que se puso.
+        assertEquals(100.0, CalculosDeudas.totalDe(d), centavo)
+    }
+
+    @Test
+    fun `en automática al agregar una persona mas la cuota baja`() {
+        val d = deuda(
+            modo = ModoDeuda.META,
+            total = 100.0,
+            personasQuePagan = null,
+            personas = List(4) { persona("p$it", "Persona $it") }
+        )
+        assertEquals(25.0, CalculosDeudas.montoBaseDe(d), centavo)
+
+        // La lista manda: una persona más y la cuota baja.
+        val conMas = d.copy(personas = d.personas + persona("p5", "Otra persona"))
+        assertEquals(5, CalculosDeudas.pagadoresDe(conMas))
+        assertEquals(20.0, CalculosDeudas.montoBaseDe(conMas), centavo)
+    }
+
+    @Test
+    fun `con el numero a mano la cuota no depende de la lista`() {
+        val d = deuda(
+            modo = ModoDeuda.META,
+            total = 100.0,
+            personasQuePagan = 5,
+            personas = listOf(persona("p1", "Cesar"), persona("p2", "Ana"))
+        )
+        assertEquals(5, CalculosDeudas.pagadoresDe(d))
+        assertEquals(20.0, CalculosDeudas.montoBaseDe(d), centavo)
+
+        // Agregar gente a la lista NO cambia la cuota: el número manda.
+        val conMas = d.copy(personas = d.personas + List(10) { persona("x$it", "Extra $it") })
+        assertEquals(20.0, CalculosDeudas.montoBaseDe(conMas), centavo)
+        assertEquals(100.0, CalculosDeudas.totalDe(conMas), centavo)
+    }
+
+    @Test
+    fun `con cuota personalizada en automática manda la cuota fija`() {
+        val d = deuda(
+            modo = ModoDeuda.META,
+            total = 42.80,
+            personasQuePagan = null,
+            personas = List(4) { persona("p$it", "Persona $it") },
+            cuotaPersonalizada = 1.90
+        )
+        // No se divide: la cuota es la que puso César.
+        assertEquals(1.90, CalculosDeudas.montoBaseDe(d), centavo)
+        assertEquals(1.90, CalculosDeudas.cuotaDe(d, d.personas[0]), centavo)
+        // El total a cobrar sale de multiplicar por la gente de la lista.
+        assertEquals(7.60, CalculosDeudas.totalDe(d), centavo)
+    }
+
+    @Test
+    fun `en automática en modo libre la cuota no se divide pero el total sale de la lista`() {
+        val d = deuda(
+            modo = ModoDeuda.LIBRE,
+            montoPorPersona = 4.0,
+            personasQuePagan = null,
+            personas = List(3) { persona("p$it", "Persona $it") }
+        )
+        // En modo libre cada uno paga lo que puso César: no se divide.
+        assertEquals(4.0, CalculosDeudas.montoBaseDe(d), centavo)
+        // Pero el total sale de la gente de la lista: 3 × 4.
+        assertEquals(12.0, CalculosDeudas.totalDe(d), centavo)
+    }
+
+    @Test
+    fun `es automática solo cuando no se dijo el numero`() {
+        assertTrue(CalculosDeudas.esAutomatica(deuda(personasQuePagan = null)))
+        assertFalse(CalculosDeudas.esAutomatica(deuda(personasQuePagan = 5)))
     }
 
     // ------------------------------------------------------------------

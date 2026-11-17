@@ -20,8 +20,12 @@ import java.time.ZoneId
  *   cada quien. El total se calcula sumando.
  *
  * En los dos modos:
- * - La deuda dice **cuántas personas tienen que pagarlo** ([Deuda.personasQuePagan]).
- * - La lista de personas NO divide nada: es a quién se le está cobrando.
+ * - La deuda dice **cuántas personas tienen que pagarlo**
+ *   ([Deuda.personasQuePagan]). Ese campo es **opcional**: si no se dice
+ *   cuántos van a pagar, la cuota sale de la gente que se vaya añadiendo a la
+ *   lista ([Deuda.cuotaAutomatica]).
+ * - Con el número a mano, la lista de personas NO divide nada: es a quién se
+ *   le está cobrando.
  * - Cada persona puede tener un **monto propio** (el "caso especial"): unos
  *   pagan 4 y otros 2.
  * - En modo META, el monto propio **redistribuye**: los que pagan la cuota
@@ -105,6 +109,8 @@ data class Pago(
  * - [cuotaPersonalizada]: la cuota fija que Cesar cobra a cada uno, cuando no
  *   quiere que el costo se divida. Es opcional: si no está, la cuota sale
  *   de dividir como siempre.
+ * - [personasQuePagan]: cuántos van a pagar. Es **opcional**: si no se dice,
+ *   la cuota sale de la lista de personas ([cuotaAutomatica]).
  */
 @Serializable
 data class Deuda(
@@ -124,11 +130,31 @@ data class Deuda(
     /**
      * Cuántas personas tienen que pagar este total. De ahí sale la cuota.
      *
-     * SIN valor por defecto a propósito: si el archivo viejo no lo tiene, la
-     * carga falla y [RepositorioDeudas] lo repara poniéndole la cantidad de
-     * personas que había en la lista.
+     * Es **opcional**: `null` = no se dijo cuántos van a pagar. En ese caso la
+     * cuota se calcula con la gente que está en la lista (ver
+     * [cuotaAutomatica]): si se añaden 4 personas, la cuota es la cuarta parte
+     * del total, sin que haga falta saber de antemano cuántos son.
+     *
+     * Los archivos viejos del teléfono (que sí traen el número) se leen sin
+     * problema: el valor por defecto solo se usa cuando el campo no está.
      */
-    val personasQuePagan: Int,
+    val personasQuePagan: Int? = null,
+    /**
+     * Marca de **cuota automática**: la cuota se calcula con la gente que está
+     * en la lista y no con [personasQuePagan].
+     *
+     * Sirve para distinguir dos cosas que se ven igual en el archivo:
+     * - "el usuario no dijo cuántos van a pagar" (deuda nueva en automático:
+     *   se deja el número en `null` y se marca acá).
+     * - "este archivo es viejo y le falta el campo" (eso se repara al cargar,
+     *   en [RepositorioDeudas]).
+     *
+     * El valor por defecto sale del propio [personasQuePagan]: si no hay
+     * número, la cuota es automática. Si al editar una deuda el número y la
+     * marca quedan distintos, es el [RepositorioDeudas] el que los deja de
+     * nuevo en sincronía antes de guardar el archivo.
+     */
+    val cuotaAutomatica: Boolean = personasQuePagan == null,
     val personas: List<PersonaDeuda> = emptyList(),
     val pagos: List<Pago> = emptyList(),
     val saldada: Boolean = false,

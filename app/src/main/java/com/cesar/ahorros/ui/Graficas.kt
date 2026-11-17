@@ -54,14 +54,17 @@ data class PuntoDona(val etiqueta: String, val valor: Double, val color: Color)
 @Composable
 fun GraficaBarras(
     puntos: List<PuntoBarra>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    clave: Any? = null
 ) {
     val medidor = rememberTextMeasurer()
     val estiloEje = TextStyle(fontSize = 10.sp, color = TextoSecundario)
 
     // El progreso con el que se dibuja la gráfica ahora mismo. Con las
     // animaciones apagadas vale 1: se ve todo de una, como siempre.
-    val progreso = progresoDeGraficas()
+    // La clave reinicia la animación cuando cambian los datos (por ejemplo,
+    // cuando el usuario cambia de 7 a 30 días).
+    val progreso = progresoDeGraficas(clave)
     val estilo = AparienciaActual.estiloGraficas
 
     Canvas(
@@ -198,10 +201,11 @@ private fun barraRedondeada(
 @Composable
 fun GraficaDona(
     puntos: List<PuntoDona>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    clave: Any? = null
 ) {
     val total = puntos.sumOf { it.valor }
-    val progreso = progresoDeGraficas()
+    val progreso = progresoDeGraficas(clave)
     val estilo = AparienciaActual.estiloGraficas
 
     Box(
@@ -307,12 +311,13 @@ fun LeyendaDona(puntos: List<PuntoDona>, modifier: Modifier = Modifier) {
 @Composable
 fun GraficaArea(
     valores: List<Double>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    clave: Any? = null
 ) {
     val medidor = rememberTextMeasurer()
     val estiloEje = TextStyle(fontSize = 10.sp, color = TextoSecundario)
 
-    val progreso = progresoDeGraficas()
+    val progreso = progresoDeGraficas(clave)
     val estilo = AparienciaActual.estiloGraficas
 
     // Con el estilo "Dibujar" la línea se escribe de izquierda a derecha:

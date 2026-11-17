@@ -74,8 +74,10 @@ data class PersonaPorAgregar(
  * "otra persona" para quien no está en ninguna de esas listas.
  *
  * La lista de personas **no divide nada**: la cuota la define la deuda (el
- * número de personas que la pagan). Por eso aquí solo se marca a quién se le
- * cobra, y opcionalmente un monto propio para el caso especial.
+ * número de personas que la pagan). La excepción es la cuota automática: si
+ * no se dijo cuántos van a pagar, los de la lista son los que dividen. Por
+ * eso aquí solo se marca a quién se le cobra, y opcionalmente un monto
+ * propio para el caso especial.
  *
  * Las casillas se guardan con la clave "idLista|nombre": el mismo nombre puede
  * estar en dos listas y son dos casillas distintas.
@@ -428,8 +430,8 @@ fun PantallaAnadirPersonas(
             } else {
                 "Se van a agregar $totalElegidas " +
                     (if (totalElegidas == 1) "persona" else "personas") +
-                    " a la deuda. La cuota normal la recalcula la deuda: no se divide " +
-                    "entre la lista."
+                    " a la deuda. La cuota normal la recalcula la deuda: si definiste " +
+                    "cuántos pagan, manda ese número; si no, se calcula con los que agregues."
             },
             style = MaterialTheme.typography.bodyMedium,
             color = TextoSecundario,

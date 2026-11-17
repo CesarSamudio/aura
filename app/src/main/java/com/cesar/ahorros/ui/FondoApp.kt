@@ -1,7 +1,6 @@
 package com.cesar.ahorros.ui
 
 import android.content.Context
-import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -56,20 +55,29 @@ import kotlin.math.sin
 //     cambia de tema y el fondo cambia con él.
 //
 // Todo se dibuja con `Canvas` y `Brush`: cero librerías de imágenes (la app
-// no tiene ni Coil ni Glide) y nada de API 31 (el difuminado se hace
-// achicando el mapa de bits, que funciona desde Android 7).
+// no tiene ni Coil ni Glide) y nada de API 31 (el difuminado se hace a mano
+// con un kernel gaussiano, que funciona desde Android 7).
 // ---------------------------------------------------------------------------
 
 /** Cuánto dura un ciclo completo del degradado (a velocidad 1x). */
 private const val CICLO_DEL_DEGRADADO = 12_000
 
 /**
- * Cuánto se achica la foto para difuminarla, en 4 pasos.
+ * El lado más largo (en px) de la imagen chiquita donde se desenfoca.
  *
- * Achicar y volver a estirar es EL truco para difuminar sin `Modifier.blur`
- * (que es de Android 12): el ojo lee el estirado como una imagen borrosa.
+ * Se desenfoca una imagen de 256 px y después se estira a la pantalla: el
+ * resultado se ve igual de suave y el trabajo cuesta 64 veces menos (una
+ * foto de 2048 px son 4 millones de píxeles; una de 256, 65 mil).
  */
-private val NIVELES_DE_DIFUMINADO = intArrayOf(6, 10, 16, 24)
+private const val LADO_REDUCIDA = 256
+
+/**
+ * El radio máximo del kernel gaussiano (en píxeles de la imagen chiquita).
+ *
+ * 8 píxeles de la imagen de 256 son unos 34 px de desenfoque en la
+ * pantalla: de lente, suave.
+ */
+private const val RADIO_MAXIMO = 8
 
 /**
  * El fondo de la app: la imagen del teléfono (con su opacidad y su
@@ -199,27 +207,39 @@ private fun leerFondo(contexto: Context, nombre: String): ImageBitmap? {
 }
 
 /**
- * La versión ACHICADA de la foto, que es la que se dibuja cuando el usuario
- * pide difuminado.
+ * La versión DESENFOCADA de la foto, que es la que se dibuja cuando el
+ * usuario pide difuminado.
  *
- * `Modifier.blur` y `RenderEffect` son de Android 12 (API 31): en Android 7
- * no existen. El truco es achicar el mapa de bits y dibujarlo estirado con
- * filtrado bilinear: el ojo lo lee como una imagen borrosa.
+ * Antes esto era un truco: achicar la foto y estirarla. Se veía "a píxeles",
+ * porque una foto chiquita tiene los bordes cuadrados. Ahora es un
+ * desenfoque gaussiano de verdad (ver [desenfoqueGaussiano]): la imagen se
+ * reduce a 256 px, se le pasa el kernel y después se estira. El resultado es
+ * el de una lente: degradados limpios, sin bloques.
  *
- * Achicar de a pasos de 2 (y no de golpe) es lo que evita que la imagen
- * quede "borrosa con puntitos": cada paso usa el filtrado del anterior.
+ * El radio sale del deslizador, pero se REDONDEA a píxeles enteros: así, al
+ * mover el deslizador un poquito no se recalcula el desenfoque entero (el
+ * `produceState` solo vuelve a trabajar cuando el radio cambia de verdad).
+ *
+ * El trabajo va en `Dispatchers.IO`: es cálculo puro y no puede tapar el
+ * hilo principal.
  */
 @Composable
 private fun rememberVersionDifuminada(imagen: ImageBitmap?, difuminado: Float): ImageBitmap? {
-    val nivel = (difuminado.coerceIn(0f, 1f) * NIVELES_DE_DIFUMINADO.size).roundToInt()
-    // Con difuminado 0 se dibuja la foto original, tal cual.
-    if (imagen == null || nivel == 0) return null
-    val divisor = NIVELES_DE_DIFUMINADO[(nivel - 1).coerceIn(0, NIVELES_DE_DIFUMINADO.size - 1)]
+    val valor = difuminado.coerceIn(0f, 1f)
+    // Con difuminado 0 se dibuja la foto original, tal cual: nítida.
+    if (imagen == null || valor <= 0.01f) return null
+    val radio = (valor * RADIO_MAXIMO).roundToInt()
 
-    return produceState<ImageBitmap?>(initialValue = null, imagen, divisor) {
-        value = withContext(Dispatchers.Default) {
+    return produceState<ImageBitmap?>(initialValue = null, imagen, radio) {
+        value = withContext(Dispatchers.IO) {
             try {
-                achicar(imagen.asAndroidBitmap(), divisor).asImageBitmap()
+                val original = imagen.asAndroidBitmap()
+                val reducida = reducirParaDesenfoque(original, ladoReducidoPara(radio))
+                val suave = desenfoqueGaussiano(reducida, radio)
+                // La imagen chiquita es temporal: se suelta cuando ya se
+                // dibujó (el desenfoque devuelve una copia nueva).
+                if (reducida !== original && suave !== reducida) reducida.recycle()
+                suave.asImageBitmap()
             } catch (e: Exception) {
                 null
             } catch (e: OutOfMemoryError) {
@@ -227,6 +247,20 @@ private fun rememberVersionDifuminada(imagen: ImageBitmap?, difuminado: Float): 
             }
         }
     }.value
+}
+
+/**
+ * A qué tamaño se reduce la foto antes de desenfocarla, según el radio.
+ *
+ * Con radio 0 no se reduce nada: la foto queda nítida (es lo que espera
+ * quien pone el difuminado en 0). Con radios chicos se reduce a la mitad de
+ * lado (un apenas borroso) y con radios grandes se usa la imagen chiquita de
+ * [LADO_REDUCIDA], que es la que da el desenfoque de lente.
+ */
+private fun ladoReducidoPara(radio: Int): Int = when {
+    radio <= 0 -> 0
+    radio <= 2 -> LADO_REDUCIDA * 2
+    else -> LADO_REDUCIDA
 }
 
 /**
@@ -292,9 +326,11 @@ private fun DrawScope.dibujarFondo(pintura: PinturaFondo) {
             ),
             dstSize = IntSize(ancho.roundToInt(), alto.roundToInt()),
             alpha = opacidad,
-            // Bilinear: es el filtro que hace que la versión achicada se vea
-            // borrosa y no "a cuadros".
-            filterQuality = FilterQuality.Low
+            // La foto nítida se estira con bilineal (rápido). La que ya
+            // viene desenfocada se estira con filtro bueno: al ser tan
+            // chiquita, el filtro hace la diferencia entre un degradado
+            // limpio y uno "a cuadritos".
+            filterQuality = if (pintura.difuminada != null) FilterQuality.Medium else FilterQuality.Low
         )
     }
 
@@ -480,32 +516,6 @@ private fun DrawScope.dibujarDegradado(
 // ---------------------------------------------------------------------------
 // Ayuditas
 // ---------------------------------------------------------------------------
-
-/**
- * Achica el mapa de bits en pasos de 2 (para difuminar).
- *
- * Bajar de golpe (de 2048 a 80 de un tirón) deja la imagen con puntitos;
- * bajando de a mitades, cada paso usa el filtrado del anterior y el
- * resultado queda limpio.
- */
-private fun achicar(bitmap: Bitmap, divisor: Int): Bitmap {
-    var actual = bitmap
-    var restante = divisor
-    while (restante > 1) {
-        val paso = if (restante % 2 == 0) 2 else restante
-        val ancho = (actual.width / paso).coerceAtLeast(1)
-        val alto = (actual.height / paso).coerceAtLeast(1)
-        val nuevo = Bitmap.createScaledBitmap(actual, ancho, alto, true)
-        if (nuevo !== actual) {
-            // El intermedio se suelta ya: si no, se acumulan 4 copias de la
-            // foto en la memoria.
-            if (actual !== bitmap) actual.recycle()
-            actual = nuevo
-        }
-        restante /= paso
-    }
-    return actual
-}
 
 /** Mezcla un color con el del fondo: `factor` es cuánto del fondo entra (0..1). */
 private fun mezclarConFondo(color: Color, fondo: Color, factor: Float): Color = Color(

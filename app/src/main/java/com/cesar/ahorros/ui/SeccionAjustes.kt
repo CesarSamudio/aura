@@ -5,6 +5,8 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -207,7 +209,13 @@ fun FilaDeslizador(
  * Una fila de opciones (chips) para elegir UNA.
  *
  * Cada chip se puede apretar y soltar: sale la explicación de esa opción.
+ *
+ * La fila **se reparte en varias líneas** si no entra: con cuatro opciones
+ * ("Crecer", "Dibujar", "Suave", "Sin animación") en una pantalla angosta no
+ * entran ni de casualidad, y si se aprietan el texto se parte ("Sin animació
+ * n") y el chip queda raro.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun <T> FilaOpciones(
     opciones: List<T>,
@@ -217,9 +225,10 @@ fun <T> FilaOpciones(
     onExplicacion: (T) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(
+    FlowRow(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         opciones.forEach { opcion ->
             ChipOpcion(
@@ -257,6 +266,9 @@ fun ChipOpcion(
             text = texto,
             style = MaterialTheme.typography.labelLarge,
             color = if (seleccionado) TextoPrimario else TextoSecundario,
+            // Una sola línea: el texto nunca se parte (ni "Sin animació n").
+            maxLines = 1,
+            softWrap = false,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
         )
     }

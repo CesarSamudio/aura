@@ -15,6 +15,7 @@ import androidx.compose.runtime.remember
 import com.cesar.ahorros.data.EstiloGraficas
 import com.cesar.ahorros.data.EstiloInterfaz
 import com.cesar.ahorros.data.EstiloNumeros
+import kotlinx.coroutines.delay
 
 /**
  * # El motor de animaciones de la app
@@ -189,7 +190,7 @@ fun rememberNumeroAnimado(valor: Double): State<Double> {
  * - **SUAVE** — un fundido parejo, sin que las barras se muevan.
  */
 @Composable
-fun progresoDeGraficas(): Float {
+fun progresoDeGraficas(clave: Any? = null): Float {
     val estilo = AparienciaActual.estiloGraficas
     val duracion = AparienciaActual.duracion(Duraciones.GRAFICAS)
     val activo = estilo != EstiloGraficas.NINGUNA
@@ -201,7 +202,7 @@ fun progresoDeGraficas(): Float {
         EstiloGraficas.NINGUNA -> tween<Float>(duracion, easing = LinearEasing)
     }
 
-    return rememberProgreso(activo, duracion, estilo, especificacion)
+    return rememberProgreso(activo, duracion, estilo to clave, especificacion)
 }
 
 /**
@@ -242,7 +243,7 @@ fun progresoDeGraficas(): Float {
  * ```
  */
 @Composable
-fun progresoDeEntrada(): Float {
+fun progresoDeEntrada(clave: Any? = null): Float {
     val estilo = AparienciaActual.estiloInterfaz
     val duracion = AparienciaActual.duracion(Duraciones.INTERFAZ)
     val activo = estilo != EstiloInterfaz.NINGUNA
@@ -254,7 +255,44 @@ fun progresoDeEntrada(): Float {
         EstiloInterfaz.NINGUNA -> tween<Float>(duracion, easing = LinearEasing)
     }
 
-    return rememberProgreso(activo, duracion, estilo, especificacion)
+    return rememberProgreso(activo, duracion, estilo to clave, especificacion)
+}
+
+/**
+ * El progreso de entrada de una **fila de una lista**, con escalonado.
+ *
+ * Es el patrón "escalonado": cada fila entra un poquito después que la
+ * anterior, así la lista se arma sola en vez de aparecer de golpe. Con 30
+ * filas seguidas (la tabla de categorías) el ojo sigue el orden sin que
+ * haya que recargar nada.
+ *
+ * @param indice el número de fila (0 es la primera).
+ * @param clave lo que reinicia el escalonado (por ejemplo, el periodo).
+ */
+@Composable
+fun progresoDeFila(indice: Int, clave: Any? = null): Float {
+    val estilo = AparienciaActual.estiloInterfaz
+    val duracion = AparienciaActual.duracion(Duraciones.INTERFAZ)
+    val activo = estilo != EstiloInterfaz.NINGUNA
+
+    val animable = remember { Animatable(0f) }
+    val estado = remember { animable.asState() }
+
+    LaunchedEffect(activo, duracion, clave, indice) {
+        if (!activo) {
+            animable.snapTo(1f)
+            return@LaunchedEffect
+        }
+        animable.snapTo(0f)
+        // El escalonado: 40 ms por fila. Poco, pero se nota.
+        delay(indice * 40L)
+        animable.animateTo(
+            targetValue = 1f,
+            animationSpec = tween<Float>(duracion, easing = FastOutSlowInEasing)
+        )
+    }
+
+    return if (activo) estado.value else 1f
 }
 
 // ---------------------------------------------------------------------------
@@ -300,6 +338,10 @@ private fun resorteAsentamiento(duracionMs: Int): AnimationSpec<Float> {
  * - La clave del `LaunchedEffect` es lo que realmente puede cambiar: el
  *   interruptor, la velocidad y el estilo. Si cambia la velocidad a mitad de
  *   camino, la animación **sigue** desde donde estaba (no salta a cero).
+ * - La **clave de datos** (la que le pasa quien dibuja, por ejemplo el
+ *   periodo del gráfico) reinicia el progreso desde cero: si no, al cambiar
+ *   los datos la gráfica se cambiaría de golpe, sin que se note que es un
+ *   cambio y no un salto.
  */
 @Composable
 private fun rememberProgreso(
@@ -315,12 +357,18 @@ private fun rememberProgreso(
     // vuelva a entrar desde cero cuando se vuelve a prender.
     val estabaApagado = remember { mutableStateOf(false) }
 
+    // La clave de la última vez: para saber si los datos cambiaron.
+    val claveAnterior = remember { mutableStateOf<Any?>(null) }
+
     LaunchedEffect(activo, duracion, clave) {
+        val cambioDeDatos = claveAnterior.value != clave
+        claveAnterior.value = clave
+
         if (!activo) {
             animable.snapTo(1f)
             estabaApagado.value = true
         } else {
-            if (estabaApagado.value) animable.snapTo(0f)
+            if (cambioDeDatos || estabaApagado.value) animable.snapTo(0f)
             estabaApagado.value = false
             animable.animateTo(targetValue = 1f, animationSpec = especificacion)
         }
