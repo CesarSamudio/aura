@@ -206,7 +206,7 @@ class CapturaNuevasPantallasTest {
         composeTestRule.setContent {
             TemaAhorros {
                 PantallaAjustes(
-                    versionApp = "1.14",
+                    versionApp = "1.15",
                     temas = CatalogoTemas.todos,
                     temaActualId = "clasico",
                     onCambiarTema = { },
@@ -231,7 +231,7 @@ class CapturaNuevasPantallasTest {
         composeTestRule.setContent {
             TemaAhorros {
                 PantallaAjustes(
-                    versionApp = "1.14",
+                    versionApp = "1.15",
                     temas = CatalogoTemas.todos,
                     temaActualId = "clasico",
                     onCambiarTema = { },
@@ -263,7 +263,7 @@ class CapturaNuevasPantallasTest {
         composeTestRule.setContent {
             TemaAhorros {
                 PantallaAjustes(
-                    versionApp = "1.14",
+                    versionApp = "1.15",
                     temas = CatalogoTemas.todos,
                     temaActualId = "clasico",
                     onCambiarTema = { },
