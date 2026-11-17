@@ -4,7 +4,19 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.view.View
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
@@ -21,11 +33,13 @@ import com.cesar.ahorros.data.ModoDeuda
 import com.cesar.ahorros.data.Pago
 import com.cesar.ahorros.data.PersonaDeuda
 import com.cesar.ahorros.ui.CatalogoTemas
+import com.cesar.ahorros.ui.CuerpoDialogoDeudaIndividual
 import com.cesar.ahorros.ui.PantallaAjustes
 import com.cesar.ahorros.ui.PantallaAnadirPersonas
 import com.cesar.ahorros.ui.PantallaDeudaDetalle
 import com.cesar.ahorros.ui.PantallaDeudas
 import com.cesar.ahorros.ui.TemaAhorros
+import com.cesar.ahorros.ui.TextoPrimario
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -34,6 +48,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.shadows.ShadowDialog
 import java.io.File
 import java.io.FileOutputStream
 import java.time.LocalDate
@@ -439,5 +454,67 @@ class CapturaNuevasPantallasTest {
             composeTestRule.onAllNodesWithText("Añadir personas").fetchSemanticsNodes().isEmpty()
         )
         guardar("11b-detalle-deuda-individual.png", capturarPantalla())
+    }
+
+    @Test
+    fun `11c el dialogo de la deuda individual es corto`() {
+        // Se dibuja el CONTENIDO del diálogo (sin la ventana de Material): en
+        // Robolectric una ventana de diálogo nunca deja la app en reposo y
+        // los tests se cuelgan. El contenido es el mismo que usa el diálogo.
+        composeTestRule.setContent {
+            TemaAhorros {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp)
+                ) {
+                    Text(
+                        text = "Nueva deuda individual",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = TextoPrimario
+                    )
+                    Spacer(Modifier.height(14.dp))
+                    CuerpoDialogoDeudaIndividual(
+                        nombre = "",
+                        onNombre = { },
+                        montoTexto = "",
+                        onMonto = { },
+                        montoValido = false,
+                        monto = null
+                    )
+                }
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        // Solo dos cosas: el nombre y cuánto te debe. Y NADA del diálogo de
+        // las deudas de grupo.
+        assertEquals(
+            1,
+            composeTestRule.onAllNodesWithText("Nombre de la persona").fetchSemanticsNodes().size
+        )
+        assertEquals(
+            1,
+            composeTestRule.onAllNodesWithText("Cuánto te debe").fetchSemanticsNodes().size
+        )
+        assertTrue(
+            "El diálogo individual no pregunta el modo",
+            composeTestRule.onAllNodesWithText("Sé el total").fetchSemanticsNodes().isEmpty()
+        )
+        assertTrue(
+            "El diálogo individual no pregunta cuántos pagan",
+            composeTestRule.onAllNodesWithText("¿Cuántas personas lo van a pagar?")
+                .fetchSemanticsNodes().isEmpty()
+        )
+        assertTrue(
+            "El diálogo individual no pide el costo total",
+            composeTestRule.onAllNodesWithText("Costo total").fetchSemanticsNodes().isEmpty()
+        )
+        assertTrue(
+            "El diálogo individual no pide la cuota",
+            composeTestRule.onAllNodesWithText("Cuota que vas a cobrar").fetchSemanticsNodes().isEmpty()
+        )
+
+        guardar("11c-dialogo-deuda-individual.png", capturarPantalla())
     }
 }

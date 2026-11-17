@@ -552,70 +552,99 @@ fun App() {
 
     dialogoDeuda?.let { abierto ->
         // Una deuda individual le debe a UNA persona: el nombre que se
-        // escribió es el de la persona (y también el de la deuda).
+        // escribió es el de la persona (y también el de la deuda). Tiene su
+        // propio diálogo, más corto.
         val esIndividual = abierto.individual || (abierto.deuda?.individual == true)
-        DialogoDeuda(
-            inicial = abierto.deuda,
-            individual = esIndividual,
-            onGuardar = { nombre, modo, total, montoPorPersona, personasQuePagan, cuotaPersonalizada ->
-                val ahora = LocalDateTime.now().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-                val existente = abierto.deuda
-                // La cuota a mano solo tiene sentido en modo META: en modo
-                // libre el monto por persona ya es la cuota fija.
-                val cuota = if (modo == ModoDeuda.META) cuotaPersonalizada else null
-                if (existente == null) {
-                    vm.agregarDeuda(
-                        Deuda(
-                            id = vm.nuevoId(),
-                            nombre = nombre,
-                            modo = modo,
-                            // En modo libre el total se calcula: no se guarda.
-                            total = if (modo == ModoDeuda.META) total else 0.0,
-                            montoPorPersona = if (modo == ModoDeuda.LIBRE) montoPorPersona else 0.0,
-                            // En una deuda individual solo paga uno: no hay
-                            // lista que repartir.
-                            personasQuePagan = if (esIndividual) 1 else personasQuePagan,
-                            // La persona queda en la lista sola: es a quien se
-                            // le cobra (y a quien se le marca lo que pagó).
-                            personas = if (esIndividual) {
-                                listOf(PersonaDeuda(vm.nuevoId(), nombre))
-                            } else {
-                                emptyList()
-                            },
-                            pagos = emptyList(),
-                            saldada = false,
-                            cuotaPersonalizada = cuota,
-                            individual = esIndividual,
-                            ts = ahora
+        if (esIndividual) {
+            DialogoDeudaIndividual(
+                nombreInicial = abierto.deuda?.nombre ?: "",
+                montoInicial = abierto.deuda?.total ?: 0.0,
+                onGuardar = { nombre, monto ->
+                    val ahora = LocalDateTime.now().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                    val existente = abierto.deuda
+                    if (existente == null) {
+                        vm.agregarDeuda(
+                            Deuda(
+                                id = vm.nuevoId(),
+                                nombre = nombre,
+                                modo = ModoDeuda.META,
+                                total = monto,
+                                // Solo paga ella: no hay lista que repartir.
+                                personasQuePagan = 1,
+                                cuotaAutomatica = false,
+                                // La persona queda en la lista sola: es a quien
+                                // se le cobra (y a quien se le marca lo que pagó).
+                                personas = listOf(PersonaDeuda(vm.nuevoId(), nombre)),
+                                individual = true,
+                                ts = ahora
+                            )
                         )
-                    )
-                } else {
-                    // Editar la meta o la cantidad de pagadores cambia la cuota
-                    // de todos: eso es lo pedido.
-                    vm.actualizarDeuda(
-                        existente.copy(
-                            nombre = nombre,
-                            modo = modo,
-                            total = if (modo == ModoDeuda.META) total else 0.0,
-                            montoPorPersona = if (modo == ModoDeuda.LIBRE) montoPorPersona else 0.0,
-                            personasQuePagan = if (esIndividual) 1 else personasQuePagan,
-                            cuotaPersonalizada = cuota,
-                            individual = esIndividual,
-                            // En una deuda individual la persona de la lista
-                            // se llama como la deuda: si se cambia el nombre,
-                            // cambia con ella.
-                            personas = if (esIndividual) {
-                                existente.personas.map { persona -> persona.copy(nombre = nombre) }
-                            } else {
-                                existente.personas
-                            }
+                    } else {
+                        vm.actualizarDeuda(
+                            existente.copy(
+                                nombre = nombre,
+                                modo = ModoDeuda.META,
+                                total = monto,
+                                personasQuePagan = 1,
+                                cuotaAutomatica = false,
+                                individual = true,
+                                // La persona de la lista se llama como la
+                                // deuda: si cambia el nombre, cambia con él.
+                                personas = existente.personas.map { persona ->
+                                    persona.copy(nombre = nombre)
+                                }
+                            )
                         )
-                    )
-                }
-                dialogoDeuda = null
-            },
-            onCerrar = { dialogoDeuda = null }
-        )
+                    }
+                    dialogoDeuda = null
+                },
+                onCerrar = { dialogoDeuda = null }
+            )
+        } else {
+            DialogoDeuda(
+                inicial = abierto.deuda,
+                onGuardar = { nombre, modo, total, montoPorPersona, personasQuePagan, cuotaPersonalizada ->
+                    val ahora = LocalDateTime.now().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                    val existente = abierto.deuda
+                    // La cuota a mano solo tiene sentido en modo META: en modo
+                    // libre el monto por persona ya es la cuota fija.
+                    val cuota = if (modo == ModoDeuda.META) cuotaPersonalizada else null
+                    if (existente == null) {
+                        vm.agregarDeuda(
+                            Deuda(
+                                id = vm.nuevoId(),
+                                nombre = nombre,
+                                modo = modo,
+                                // En modo libre el total se calcula: no se guarda.
+                                total = if (modo == ModoDeuda.META) total else 0.0,
+                                montoPorPersona = if (modo == ModoDeuda.LIBRE) montoPorPersona else 0.0,
+                                personasQuePagan = personasQuePagan,
+                                personas = emptyList(),
+                                pagos = emptyList(),
+                                saldada = false,
+                                cuotaPersonalizada = cuota,
+                                ts = ahora
+                            )
+                        )
+                    } else {
+                        // Editar la meta o la cantidad de pagadores cambia la cuota
+                        // de todos: eso es lo pedido.
+                        vm.actualizarDeuda(
+                            existente.copy(
+                                nombre = nombre,
+                                modo = modo,
+                                total = if (modo == ModoDeuda.META) total else 0.0,
+                                montoPorPersona = if (modo == ModoDeuda.LIBRE) montoPorPersona else 0.0,
+                                personasQuePagan = personasQuePagan,
+                                cuotaPersonalizada = cuota
+                            )
+                        )
+                    }
+                    dialogoDeuda = null
+                },
+                onCerrar = { dialogoDeuda = null }
+            )
+        }
     }
 
     dialogoPersona?.let { abierto ->

@@ -13,10 +13,10 @@ Hay dos versiones de la misma app. La diferencia es **una sola lista de 24 nombr
 
 | Versión | Para quién | Archivo |
 |---|---|---|
-| **Aura v1.17** | Cualquiera | [`apk/Aura-v1.17.apk`](apk/Aura-v1.17.apk) |
-| **Aura 11G v1.17** | Los del 11G: trae la lista del salón ya escrita | [`apk/Aura-v1.17-11G.apk`](apk/Aura-v1.17-11G.apk) |
+| **Aura v1.18** | Cualquiera | [`apk/Aura-v1.18.apk`](apk/Aura-v1.18.apk) |
+| **Aura 11G v1.18** | Los del 11G: trae la lista del salón ya escrita | [`apk/Aura-v1.18-11G.apk`](apk/Aura-v1.18-11G.apk) |
 
-> **Instalá `Aura-v1.17.apk` si no sos del 11G.**
+> **Instalá `Aura-v1.18.apk` si no sos del 11G.**
 > La del 11G es EXACTAMENTE la misma app con la lista del salón escrita de antemano
 > (para no tener que teclear los 24 nombres). Además instala con otro paquete, así que
 > las dos conviven en el mismo teléfono sin pisarse.
@@ -24,7 +24,7 @@ Hay dos versiones de la misma app. La diferencia es **una sola lista de 24 nombr
 Para instalar: copiá el `.apk` al teléfono y abrilo. Android va a pedir permiso para
 instalar apps de fuentes desconocidas: es normal, es el aviso de siempre.
 
-Si preferís bajarlo de GitHub, los mismos `.apk` están en la [release v1.17](https://github.com/CesarSamudio/aura/releases/tag/v1.17).
+Si preferís bajarlo de GitHub, los mismos `.apk` están en la [release v1.18](https://github.com/CesarSamudio/aura/releases/tag/v1.18).
 
 ## Qué hace
 
