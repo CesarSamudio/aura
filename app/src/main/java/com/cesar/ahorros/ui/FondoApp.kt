@@ -61,6 +61,16 @@ import kotlin.math.sin
 private const val CICLO_DEL_DEGRADADO = 12_000
 
 /**
+ * El tiempo que se cuenta como máximo entre un fotograma y el siguiente.
+ *
+ * Un fotograma normal dura 16 ms. Si entre dos pasan 100 ms o más (la app
+ * estuvo en segundo plano, el teléfono se quedó quieto, o el sistema
+ * anduvo ocupado), no se cuenta todo: el fondo sigue donde estaba en vez
+ * de dar un salto gigante.
+ */
+private const val SEGUNDO_MAXIMO = 0.1f
+
+/**
  * El lado más largo (en px) de la imagen chiquita donde se desenfoca.
  *
  * Se desenfoca una imagen de 256 px y después se estira a la pantalla: el
@@ -317,12 +327,18 @@ internal fun rememberFaseDelDegradado(activo: Boolean, velocidad: Float): State<
  * vuelta completa cada [CICLO_DEL_DEGRADADO] milisegundos a velocidad 1x;
  * la velocidad que eligió el usuario multiplica ese avance.
  *
+ * El tiempo se TOPA en [SEGUNDO_MAXIMO]: si la app estuvo en segundo plano
+ * (o el teléfono se quedó quieto), entre un fotograma y el otro pasa un
+ * montón de tiempo. Sin tope, el fondo pegaría un salto gigante al
+ * volver; con el tope, sigue donde estaba.
+ *
  * El resultado siempre queda entre 0 y 1. Al pasar de 1 a 0 no se ve
  * ningún corte porque el dibujo es CONTINUO: cada forma termina el ciclo
  * EXACTAMENTE donde empezó (ver [dibujarDegradado]).
  */
 internal fun avanzarFase(fase: Float, segundos: Float, velocidad: Float): Float {
-    val vuelta = segundos * velocidad.coerceIn(0.25f, 3f) * 1000f / CICLO_DEL_DEGRADADO
+    val contados = segundos.coerceAtMost(SEGUNDO_MAXIMO)
+    val vuelta = contados * velocidad.coerceIn(0.25f, 3f) * 1000f / CICLO_DEL_DEGRADADO
     val resultado = (fase + vuelta) % 1f
     return if (resultado < 0f) resultado + 1f else resultado
 }

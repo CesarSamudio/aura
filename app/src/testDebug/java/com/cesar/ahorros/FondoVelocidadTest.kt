@@ -54,9 +54,9 @@ class FondoVelocidadTest {
         composeTestRule.mainClock.advanceTimeBy(16)
         val antes = fase!!.value
 
-        // Un segundo a velocidad normal: una doceava parte de la vuelta
-        // (el ciclo dura doce segundos).
-        composeTestRule.mainClock.advanceTimeBy(1000)
+        // Un segundo de fotogramas de verdad (16 ms cada uno): una
+        // doceava parte de la vuelta (el ciclo dura doce segundos).
+        repetirFotogramas(63)
         val normal = fase!!.value
         assertEquals(1f / 12f, normal - antes, 0.02f)
 
@@ -68,8 +68,15 @@ class FondoVelocidadTest {
 
         // Un segundo a 3x: tiene que avanzar TRES veces más que antes, sin
         // haber salido de la pantalla.
-        composeTestRule.mainClock.advanceTimeBy(1000)
+        repetirFotogramas(63)
         val rapida = fase!!.value
         assertEquals(3f / 12f, rapida - trasElCambio, 0.02f)
+    }
+
+    /** Pasa `cantidad` fotogramas de 16 ms (uno cada frame). */
+    private fun repetirFotogramas(cantidad: Int) {
+        repeat(cantidad) {
+            composeTestRule.mainClock.advanceTimeBy(16)
+        }
     }
 }

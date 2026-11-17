@@ -41,21 +41,35 @@ class FondoAnimadoTest {
 
     @Test
     fun `la fase da una vuelta completa en doce segundos a velocidad normal`() {
-        // Doce segundos es un ciclo entero: la fase vuelve al punto de
-        // partida (no a 1, que ya sería el vuelta siguiente).
-        assertEquals(0f, avanzarFase(0f, 12f, 1f), 0.0001f)
-        assertEquals(0f, avanzarFase(0.5f, 6f, 1f), 0.0001f)
+        // Doce segundos de fotogramas de verdad (16 ms cada uno, que es lo
+        // que dura un fotograma normal): la fase vuelve al punto de
+        // partida (no a 1, que ya sería la vuelta siguiente).
+        var fase = 0f
+        repeat(750) { fase = avanzarFase(fase, 0.016f, 1f) }
+        assertTrue(
+            "la fase no cerró el ciclo (quedó en $fase)",
+            fase < 0.01f || fase > 0.99f
+        )
     }
 
     @Test
     fun `la fase avanza mas rapido con mas velocidad`() {
-        val unSegundo = 1f
-        val normal = avanzarFase(0f, unSegundo, 1f)
-        val rapida = avanzarFase(0f, unSegundo, 2f)
-        val lentisima = avanzarFase(0f, unSegundo, 0.25f)
+        // Un fotograma (16 ms) a cada velocidad.
+        val normal = avanzarFase(0f, 0.016f, 1f)
+        val rapida = avanzarFase(0f, 0.016f, 2f)
+        val lentisima = avanzarFase(0f, 0.016f, 0.25f)
 
         assertEquals(normal * 2f, rapida, 0.0001f)
         assertEquals(normal / 4f, lentisima, 0.0001f)
+    }
+
+    @Test
+    fun `un salto enorme de tiempo no mueve el fondo de golpe`() {
+        // Si la app estuvo en segundo plano, entre un fotograma y el otro
+        // pasan minutos. El fondo tiene que seguir donde estaba, no dar
+        // un salto gigante.
+        val fase = avanzarFase(0f, 600f, 1f)
+        assertTrue("la fase se movió de golpe: $fase", fase < 0.01f)
     }
 
     @Test
