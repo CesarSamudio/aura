@@ -2,20 +2,18 @@ package com.cesar.ahorros.ui
 
 import android.content.Context
 import android.graphics.BitmapFactory
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
@@ -266,30 +264,67 @@ private fun ladoReducidoPara(radio: Int): Int = when {
 /**
  * La fase del degradado animado: va de 0 a 1 y vuelve a empezar.
  *
- * La transición SOLO se crea si el degradado está prendido: apagado, no
- * hay reloj de animación corriendo y la app no gasta CPU. Si el usuario
- * apagó todas las animaciones, el degradado se dibuja pero quieto.
+ * ## Por qué el reloj es propio
+ *
+ * Antes usaba `rememberInfiniteTransition`: su `animationSpec` se guarda en
+ * un `remember` SIN claves, así que la transición se queda con la del
+ * PRIMER fotograma para siempre. Si el usuario movía el deslizador de
+ * velocidad, el fondo seguía moviéndose a la velocidad vieja (ni en la
+ * vista previa de Ajustes ni en el fondo real) hasta salirse de Ajustes y
+ * volver a entrar: ahí el composable se recreaba y sí cogía la nueva.
+ *
+ * Con el reloj de abajo la velocidad se aplica AL INSTANTE, y además la
+ * fase NO se reinicia: el fondo sigue donde estaba y solo cambia lo
+ * rápido que avanza. Tocar el deslizador no da ningún salto.
+ *
+ * ## Cuando el degradado está apagado
+ *
+ * No hay reloj corriendo: el degradado se dibuja pero quieto y la app no
+ * gasta CPU. Si el usuario apagó todas las animaciones, pasa lo mismo.
+ *
+ * (No es `private` a propósito: los tests la usan para comprobar que la
+ * velocidad se aplica al instante, sin tener que salir de la pantalla.)
  */
 @Composable
-private fun rememberFaseDelDegradado(activo: Boolean, velocidad: Float): State<Float> {
+internal fun rememberFaseDelDegradado(activo: Boolean, velocidad: Float): State<Float> {
     if (!activo || !AparienciaActual.animacionesActivas) {
         return remember { mutableStateOf(0f) }
     }
 
-    val transicion = rememberInfiniteTransition(label = "fondo-degradado")
-    val duracion = (CICLO_DEL_DEGRADADO / velocidad.coerceIn(0.25f, 3f))
-        .toInt()
-        .coerceIn(800, 120_000)
+    val fase = remember { mutableFloatStateOf(0f) }
 
-    return transicion.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(duracion, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "fase"
-    )
+    // La velocidad se lee en CADA fotograma: si el usuario la cambia a
+    // mitad de camino, el cambio se nota al instante (y sin salto).
+    val velocidadActual = rememberUpdatedState(velocidad)
+
+    LaunchedEffect(Unit) {
+        var anterior = withFrameNanos { it }
+        while (true) {
+            val ahora = withFrameNanos { it }
+            val segundos = (ahora - anterior) / 1_000_000_000f
+            anterior = ahora
+            fase.floatValue = avanzarFase(fase.floatValue, segundos, velocidadActual.value)
+        }
+    }
+
+    return fase
+}
+
+/**
+ * Cómo avanza la fase con el tiempo.
+ *
+ * `segundos` es lo que pasó desde el fotograma anterior. La fase da una
+ * vuelta completa cada [CICLO_DEL_DEGRADADO] milisegundos a velocidad 1x;
+ * la velocidad que eligió el usuario multiplica ese avance.
+ *
+ * El resultado siempre queda entre 0 y 1. Al pasar de 1 a 0 no se ve
+ * ningún corte porque el dibujo es CONTINUO: cada forma termina el ciclo
+ * EXACTAMENTE donde empezó (ver [dibujarDegradado]).
+ */
+internal fun avanzarFase(fase: Float, segundos: Float, velocidad: Float): Float {
+    val vuelta = segundos * velocidad.coerceIn(0.25f, 3f) * 1000f / CICLO_DEL_DEGRADADO
+    val resultado = (fase + vuelta) % 1f
+    return if (resultado < 0f) resultado + 1f else resultado
 }
 
 // ---------------------------------------------------------------------------
@@ -343,11 +378,20 @@ private fun DrawScope.dibujarFondo(pintura: PinturaFondo) {
 /**
  * Las cinco formas del degradado.
  *
- * Todas usan la fase (0 a 1) y el seno del ángulo: por eso el movimiento es
- * continuo y el reinicio del ciclo no se nota (el seno vuelve al mismo
- * punto).
+ * Todas usan la fase (0 a 1) y el seno del ángulo. El truco para que el
+ * fondo NO dé un salto al terminar el ciclo es que todas las frecuencias
+ * sean ENTERAS: con la fase en 1, sin(2π·k) vale 0 y cos(2π·k) vale 1,
+ * exactamente igual que con la fase en 0. Así el ciclo cierra solo: el
+ * movimiento es infinito de verdad y no "vuelve al principio" de golpe.
+ *
+ * (El barrido es la excepción, y a propósito: su banda sale de la
+ * pantalla por un lado antes de volver a entrar por el otro, así que el
+ * reinicio del ciclo pasa fuera de la vista.)
+ *
+ * (No es `private` a propósito: las capturas de prueba la llaman con una
+ * fase exacta para ver fotograma a fotograma cómo se mueve el fondo.)
  */
-private fun DrawScope.dibujarDegradado(
+internal fun DrawScope.dibujarDegradado(
     forma: FormaDegradado,
     fase: Float,
     colores: List<Color>
@@ -355,26 +399,24 @@ private fun DrawScope.dibujarDegradado(
     if (colores.isEmpty()) return
 
     val centro = Offset(size.width / 2f, size.height / 2f)
-    val ondas = fase * 2f * PI.toFloat()
 
     when (forma) {
 
         // Un halo radial en el centro que respira: crece, se achica y sube
         // y baja la luz.
         FormaDegradado.AUREOLA -> {
-            val radio = size.minDimension * (0.42f + 0.16f * sin(ondas))
-            val brillo = 0.75f + 0.25f * sin(ondas)
+            val halo = haloAureola(size.minDimension, fase)
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        colores[0].copy(alpha = colores[0].alpha * brillo),
+                        colores[0].copy(alpha = colores[0].alpha * halo.brillo),
                         colores[1 % colores.size].copy(alpha = colores[1 % colores.size].alpha * 0.45f),
                         Color.Transparent
                     ),
                     center = centro,
-                    radius = radio
+                    radius = halo.radio
                 ),
-                radius = radio,
+                radius = halo.radio,
                 center = centro
             )
         }
@@ -384,24 +426,7 @@ private fun DrawScope.dibujarDegradado(
         // se mezclan como la aurora del norte).
         FormaDegradado.AURORA -> {
             val radio = size.minDimension * 0.8f
-            val puntos = listOf(
-                Offset(
-                    size.width * (0.20f + 0.22f * sin(ondas)),
-                    size.height * (0.26f + 0.16f * cos(ondas * 0.8f))
-                ),
-                Offset(
-                    size.width * (0.80f + 0.20f * cos(ondas * 1.1f)),
-                    size.height * (0.42f + 0.20f * sin(ondas * 0.7f))
-                ),
-                Offset(
-                    size.width * (0.50f + 0.26f * sin(ondas * 0.9f + 1.6f)),
-                    size.height * (0.74f + 0.14f * cos(ondas * 1.3f))
-                ),
-                Offset(
-                    size.width * (0.30f + 0.18f * sin(ondas * 1.2f + 3.0f)),
-                    size.height * (0.56f + 0.22f * cos(ondas * 0.9f + 2.0f))
-                )
-            )
+            val puntos = manchasAurora(size.width, size.height, fase)
             puntos.forEachIndexed { indice, centroMancha ->
                 val color = colores[indice % colores.size]
                 drawCircle(
@@ -426,8 +451,7 @@ private fun DrawScope.dibujarDegradado(
             // La banda entra por la izquierda y sale por la derecha: en los
             // extremos está fuera de la pantalla, así que cuando el ciclo
             // vuelve a empezar el salto no se ve.
-            val recorrido = size.width + ancho * 2f
-            val x = -ancho + recorrido * fase
+            val (x, x2) = bandasBarrido(size.width, ancho, fase)
             drawRect(
                 brush = Brush.linearGradient(
                     colors = listOf(Color.Transparent, colores[0], Color.Transparent),
@@ -437,7 +461,6 @@ private fun DrawScope.dibujarDegradado(
                 size = this.size
             )
             // Una segunda banda, más fina y del otro color, da profundidad.
-            val x2 = -ancho + recorrido * ((fase + 0.5f) % 1f)
             drawRect(
                 brush = Brush.linearGradient(
                     colors = listOf(Color.Transparent, colores[1 % colores.size], Color.Transparent),
@@ -450,7 +473,7 @@ private fun DrawScope.dibujarDegradado(
 
         // Un abanico de color girando alrededor de un punto.
         FormaDegradado.CONICO -> {
-            rotate(degrees = fase * 360f, pivot = centro) {
+            rotate(degrees = giroConico(fase), pivot = centro) {
                 drawCircle(
                     brush = Brush.sweepGradient(
                         // El primer color se repite al final: si no, al girar
@@ -480,20 +503,9 @@ private fun DrawScope.dibujarDegradado(
         // su esquina a la de enfrente y vuelve, y al cruzarse en el medio
         // tejen el fondo.
         FormaDegradado.MALLA -> {
-            val esquinas = listOf(
-                Offset(0f, 0f),
-                Offset(size.width, 0f),
-                Offset(size.width, size.height),
-                Offset(0f, size.height)
-            )
             val radio = size.minDimension * 0.7f
-            esquinas.forEachIndexed { indice, esquina ->
-                val t = triangular((fase + indice * 0.25f) % 1f)
-                val opuesta = esquinas[(indice + 2) % 4]
-                val centroFoco = Offset(
-                    esquina.x + (opuesta.x - esquina.x) * t,
-                    esquina.y + (opuesta.y - esquina.y) * t
-                )
+            val focos = focosMalla(size.width, size.height, fase)
+            focos.forEachIndexed { indice, centroFoco ->
                 val color = colores[indice % colores.size]
                 drawCircle(
                     brush = Brush.radialGradient(
@@ -516,6 +528,113 @@ private fun DrawScope.dibujarDegradado(
 // ---------------------------------------------------------------------------
 // Ayuditas
 // ---------------------------------------------------------------------------
+
+/**
+ * El movimiento de cada forma, en funciones PURAS (sin dibujar nada).
+ *
+ * Están aparte del dibujo por dos razones:
+ *
+ *  1. Se pueden **probar**: los tests comprueban que, al terminar el
+ *     ciclo, cada forma vuelve EXACTAMENTE al punto donde empezó (que es
+ *     lo que hace que el fondo no dé un salto).
+ *  2. Se ven de un vistazo: todas las frecuencias son enteras y eso es
+ *     justamente lo que hace que el ciclo cierre.
+ */
+
+/** El halo de la aureola: qué tan grande es y qué tan brillante. */
+internal data class Halo(val radio: Float, val brillo: Float)
+
+/**
+ * El halo de la aureola, con la fase de este momento.
+ *
+ * Con la fase en 0 y con la fase en 1 da EXACTAMENTE lo mismo (el seno
+ * vuelve al mismo punto): por eso el ciclo cierra sin que se note.
+ */
+internal fun haloAureola(ladoCorto: Float, fase: Float): Halo {
+    val ondas = fase * 2f * PI.toFloat()
+    return Halo(
+        radio = ladoCorto * (0.42f + 0.16f * sin(ondas)),
+        brillo = 0.75f + 0.25f * sin(ondas)
+    )
+}
+
+/**
+ * Las cuatro manchas de la aurora, con la fase de este momento.
+ *
+ * Las frecuencias son ENTERAS (1, 2 y 3) a propósito: con la fase en 1 el
+ * seno y el coseno valen exactamente lo mismo que con la fase en 0, así
+ * que el ciclo cierra EXACTO y el fondo no pega un salto al terminar.
+ *
+ * Antes eran decimales (0.8, 1.1, 0.7…): con esos, al terminar el ciclo
+ * las manchas quedaban en otro sitio y el fondo cortaba de golpe. Era el
+ * único corte que se veía, y justo en la forma que más se nota.
+ */
+internal fun manchasAurora(ancho: Float, alto: Float, fase: Float): List<Offset> {
+    val ondas = fase * 2f * PI.toFloat()
+    return listOf(
+        Offset(
+            x = ancho * (0.20f + 0.22f * sin(ondas)),
+            y = alto * (0.26f + 0.16f * cos(ondas))
+        ),
+        Offset(
+            x = ancho * (0.80f + 0.20f * cos(ondas)),
+            y = alto * (0.42f + 0.20f * sin(2f * ondas))
+        ),
+        Offset(
+            x = ancho * (0.50f + 0.26f * sin(ondas + 1.6f)),
+            y = alto * (0.74f + 0.14f * cos(2f *ondas))
+        ),
+        Offset(
+            x = ancho * (0.30f + 0.18f * sin(2f * ondas + 3.0f)),
+            y = alto * (0.56f + 0.22f * cos(3f * ondas))
+        )
+    )
+}
+
+/**
+ * La posición de las dos bandas del barrido.
+ *
+ * La primera entra por la izquierda y sale por la derecha: cuando el
+ * ciclo vuelve a empezar, la banda está FUERA de la pantalla, así que el
+ * salto no se ve. La segunda es más fina y va del otro color.
+ */
+internal fun bandasBarrido(anchoPantalla: Float, ancho: Float, fase: Float): Pair<Float, Float> {
+    val recorrido = anchoPantalla + ancho * 2f
+    val x = -ancho + recorrido * fase
+    val x2 = -ancho + recorrido * ((fase + 0.5f) % 1f)
+    return x to x2
+}
+
+/**
+ * Los grados que gira el abanico de color.
+ *
+ * Con la fase en 1 son 360°, que es lo mismo que 0°: el ciclo cierra sin
+ * corte (y el primer color se repite al final del degradado).
+ */
+internal fun giroConico(fase: Float): Float = fase * 360f
+
+/**
+ * Los cuatro focos de la malla, con la fase de este momento.
+ *
+ * Cada foco va de su esquina a la de enfrente y vuelve (onda triangular):
+ * con la fase en 0 y con la fase en 1 están en el mismo sitio.
+ */
+internal fun focosMalla(ancho: Float, alto: Float, fase: Float): List<Offset> {
+    val esquinas = listOf(
+        Offset(0f, 0f),
+        Offset(ancho, 0f),
+        Offset(ancho, alto),
+        Offset(0f, alto)
+    )
+    return esquinas.mapIndexed { indice, esquina ->
+        val t = triangular((fase + indice * 0.25f) % 1f)
+        val opuesta = esquinas[(indice + 2) % 4]
+        Offset(
+            x = esquina.x + (opuesta.x - esquina.x) * t,
+            y = esquina.y + (opuesta.y - esquina.y) * t
+        )
+    }
+}
 
 /** Mezcla un color con el del fondo: `factor` es cuánto del fondo entra (0..1). */
 private fun mezclarConFondo(color: Color, fondo: Color, factor: Float): Color = Color(

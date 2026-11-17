@@ -13,10 +13,10 @@ Hay dos versiones de la misma app. La diferencia es **una sola lista de 24 nombr
 
 | Versión | Para quién | Archivo |
 |---|---|---|
-| **Aura v1.15** | Cualquiera | [`apk/Aura-v1.15.apk`](apk/Aura-v1.15.apk) |
-| **Aura 11G v1.15** | Los del 11G: trae la lista del salón ya escrita | [`apk/Aura-v1.15-11G.apk`](apk/Aura-v1.15-11G.apk) |
+| **Aura v1.16** | Cualquiera | [`apk/Aura-v1.16.apk`](apk/Aura-v1.16.apk) |
+| **Aura 11G v1.16** | Los del 11G: trae la lista del salón ya escrita | [`apk/Aura-v1.16-11G.apk`](apk/Aura-v1.16-11G.apk) |
 
-> **Instalá `Aura-v1.15.apk` si no sos del 11G.**
+> **Instalá `Aura-v1.16.apk` si no sos del 11G.**
 > La del 11G es EXACTAMENTE la misma app con la lista del salón escrita de antemano
 > (para no tener que teclear los 24 nombres). Además instala con otro paquete, así que
 > las dos conviven en el mismo teléfono sin pisarse.
@@ -24,7 +24,7 @@ Hay dos versiones de la misma app. La diferencia es **una sola lista de 24 nombr
 Para instalar: copiá el `.apk` al teléfono y abrilo. Android va a pedir permiso para
 instalar apps de fuentes desconocidas: es normal, es el aviso de siempre.
 
-Si preferís bajarlo de GitHub, los mismos `.apk` están en la [release v1.15](https://github.com/CesarSamudio/aura/releases/tag/v1.15).
+Si preferís bajarlo de GitHub, los mismos `.apk` están en la [release v1.16](https://github.com/CesarSamudio/aura/releases/tag/v1.16).
 
 ## Qué hace
 
@@ -46,7 +46,9 @@ Si preferís bajarlo de GitHub, los mismos `.apk` están en la [release v1.15](h
   que se vea bien y no pese tanto) y se le ajusta la opacidad y el difuminado (de
   verdad, con kernel gaussiano: se ve como el de una lente, no a píxeles).
 - **Fondo animado**: degradados que se mueven (aureola, aurora, barrido, cónico o
-  malla), con su opacidad, velocidad e intensidad.
+  malla), con su opacidad, velocidad e intensidad. El movimiento es **un bucle
+  continuo**: el fondo nunca da un salto cuando el ciclo termina, y la velocidad se
+  aplica al instante (se nota en la vista previa, sin salir de Ajustes).
 - **Animaciones a tu medida**: las gráficas, los números y la interfaz se pueden
   apagar, acelerar o frenar, y cada cosa tiene su estilo. Apretando y soltando
   una opción te explica qué hace.
@@ -102,10 +104,14 @@ Sin la clave, el build compila igual pero el APK sale **sin firmar** (no se pued
 - **MVVM** con `StateFlow`; los datos se guardan en **JSON plano** dentro de la carpeta
   de la app (`movimientos.json`, `deudas.json`, `listas.json`, `ajustes.json`).
 - **Sin base de datos**: para este volumen es instantáneo y no pesa nada en el APK.
-- **228 tests** en verde (259 con las capturas), entre ellos uno que mide el
+- **237 tests** en verde (270 con las capturas), entre ellos uno que mide el
   **contraste de color de los 7 temas contra WCAG 2.2 AA** y otro que mide el
   contraste de los colores que personaliza el usuario.- Las capturas de pantalla de los tests se generan en el PC con **Robolectric**
   (gráficos nativos), sin emulador.
+- **El fondo animado está comprobado fotograma a fotograma**: un test dibuja un ciclo
+  completo del degradado y mide que el final sea **idéntico** al principio (que es lo
+  que evita el salto al terminar), y otro comprueba que la velocidad se aplica al
+  instante sin salir de la pantalla.
 
 ## Las capturas
 
@@ -113,6 +119,11 @@ Sin la clave, el build compila igual pero el APK sale **sin firmar** (no se pued
 |---|---|
 | ![Ajustes: los temas](docs/ajustes-apariencia.png) | ![Ajustes: la paleta a tu gusto](docs/ajustes-colores.png) |
 | **Ajustes → Apariencia**: los temas de fábrica | **Colores**: cada color por separado, con su hexadecimal |
+
+Y el fondo animado, fotograma a fotograma (una fila por forma; el primer fotograma y
+el último son el mismo punto del ciclo, así que el bucle no da ningún salto):
+
+![El ciclo completo del fondo animado](docs/fondo-ciclo.png)
 
 ## Licencia
 
