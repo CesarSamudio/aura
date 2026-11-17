@@ -67,6 +67,12 @@ fun PantallaBalance(movimientos: List<Movimiento>, onAjustes: () -> Unit) {
     }
     val neto = totalAhorros - totalGastos
 
+    // Con "combinar ahorros con gastos" prendido, el dinero de los ahorros es
+    // el balance (lo que queda después de gastar). Por eso la tarjeta deja de
+    // llamarse "Ahorros" y pasa a llamarse "Depósitos": lo que hay en esa
+    // tarjeta es lo que se metió, no lo que queda.
+    val combinar = PreferenciasActual.combinarAhorrosYGastos
+
     val enPeriodo = remember(movimientos, periodo) {
         val desde = LocalDate.now().minusDays(periodo.dias - 1L)
         movimientos.filter { !it.fecha.isBefore(desde) }
@@ -128,10 +134,10 @@ fun PantallaBalance(movimientos: List<Movimiento>, onAjustes: () -> Unit) {
         item(key = "kpis") {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 TarjetaKpi(
-                    titulo = "Ahorros",
+                    titulo = if (combinar) "Depósitos" else "Ahorros",
                     valor = totalAhorros.dineroSimbolo(),
                     colorValor = AcentoMenta,
-                    pie = "depositado",
+                    pie = if (combinar) "lo que has metido" else "depositado",
                     modifier = Modifier.weight(1f),
                     valorAnimado = totalAhorros,
                     clave = periodo

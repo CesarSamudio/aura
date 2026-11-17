@@ -47,6 +47,7 @@ import com.cesar.ahorros.data.AppViewModel
 import com.cesar.ahorros.data.CopiaLocal
 import com.cesar.ahorros.data.Deuda
 import com.cesar.ahorros.data.FondosApp
+import com.cesar.ahorros.data.FuenteAhorro
 import com.cesar.ahorros.data.MetodoPago
 import com.cesar.ahorros.data.ModoDeuda
 import com.cesar.ahorros.data.Movimiento
@@ -85,7 +86,7 @@ private enum class Pestana(val etiqueta: String, val icono: Int, val tipo: Tipo?
 private data class DialogoAbierto(val tipo: Tipo, val movimiento: Movimiento?)
 
 /** Qué diálogo de deuda está abierto: uno nuevo o uno en edición. */
-private data class DialogoDeudaAbierto(val deuda: Deuda?)
+private data class DialogoDeudaAbierto(val deuda: Deuda?, val individual: Boolean = false)
 
 /** A quién se le está registrando un pago. */
 private data class DialogoPagoAbierto(val persona: PersonaDeuda)
@@ -197,6 +198,12 @@ fun App() {
                 fondo = AparienciaActual.fondo
             )
         )
+    }
+
+    // Las preferencias también se guardan solas: son un interruptor, no hay
+    // nada que el usuario pueda olvidar.
+    LaunchedEffect(PreferenciasActual.preferencias) {
+        preferencias.guardarPreferencias(PreferenciasActual.preferencias)
     }
 
     // ------------------------------------------------------------------
@@ -472,7 +479,10 @@ fun App() {
                                 vistaDeudas = VistaDeudas.DETALLE
                             },
                             onEditar = { objetivo -> dialogoDeuda = DialogoDeudaAbierto(objetivo) },
-                            onEliminar = { objetivo -> aBorrarDeuda = objetivo }
+                            onEliminar = { objetivo -> aBorrarDeuda = objetivo },
+                            onNuevaIndividual = {
+                                dialogoDeuda = DialogoDeudaAbierto(null, individual = true)
+                            }
                         )
 
                         else -> PantallaDeudaDetalle(
@@ -541,8 +551,12 @@ fun App() {
     // ------------------------------------------------------------------
 
     dialogoDeuda?.let { abierto ->
+        // Una deuda individual le debe a UNA persona: el nombre que se
+        // escribió es el de la persona (y también el de la deuda).
+        val esIndividual = abierto.individual || (abierto.deuda?.individual == true)
         DialogoDeuda(
             inicial = abierto.deuda,
+            individual = esIndividual,
             onGuardar = { nombre, modo, total, montoPorPersona, personasQuePagan, cuotaPersonalizada ->
                 val ahora = LocalDateTime.now().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
                 val existente = abierto.deuda
@@ -558,11 +572,20 @@ fun App() {
                             // En modo libre el total se calcula: no se guarda.
                             total = if (modo == ModoDeuda.META) total else 0.0,
                             montoPorPersona = if (modo == ModoDeuda.LIBRE) montoPorPersona else 0.0,
-                            personasQuePagan = personasQuePagan,
-                            personas = emptyList(),
+                            // En una deuda individual solo paga uno: no hay
+                            // lista que repartir.
+                            personasQuePagan = if (esIndividual) 1 else personasQuePagan,
+                            // La persona queda en la lista sola: es a quien se
+                            // le cobra (y a quien se le marca lo que pagó).
+                            personas = if (esIndividual) {
+                                listOf(PersonaDeuda(vm.nuevoId(), nombre))
+                            } else {
+                                emptyList()
+                            },
                             pagos = emptyList(),
                             saldada = false,
                             cuotaPersonalizada = cuota,
+                            individual = esIndividual,
                             ts = ahora
                         )
                     )
@@ -575,8 +598,17 @@ fun App() {
                             modo = modo,
                             total = if (modo == ModoDeuda.META) total else 0.0,
                             montoPorPersona = if (modo == ModoDeuda.LIBRE) montoPorPersona else 0.0,
-                            personasQuePagan = personasQuePagan,
-                            cuotaPersonalizada = cuota
+                            personasQuePagan = if (esIndividual) 1 else personasQuePagan,
+                            cuotaPersonalizada = cuota,
+                            individual = esIndividual,
+                            // En una deuda individual la persona de la lista
+                            // se llama como la deuda: si se cambia el nombre,
+                            // cambia con ella.
+                            personas = if (esIndividual) {
+                                existente.personas.map { persona -> persona.copy(nombre = nombre) }
+                            } else {
+                                existente.personas
+                            }
                         )
                     )
                 }
@@ -655,6 +687,36 @@ fun App() {
                     } else {
                         null
                     }
+                    val ahora = LocalDateTime.now().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+
+                    // Si la preferencia "los pagos de las deudas van a los
+                    // ahorros" está prendida, lo cobrado entra a los ahorros
+                    // como un depósito más. El id del movimiento se anota en
+                    // el pago: si el pago se borra, el depósito se borra con
+                    // él (si no, el dinero se quedaría en los ahorros para
+                    // siempre).
+                    val movimientoId = if (PreferenciasActual.pagosDeDeudasEnAhorros && monto > 0.0) {
+                        val id = vm.nuevoId()
+                        vm.agregar(
+                            Movimiento(
+                                id = id,
+                                tipo = Tipo.AHORRO,
+                                monto = monto,
+                                // YAPI es digital; el efectivo, físico.
+                                categoria = if (metodo == MetodoPago.YAPI) {
+                                    FuenteAhorro.DIGITAL.etiqueta
+                                } else {
+                                    FuenteAhorro.FISICO.etiqueta
+                                },
+                                nota = "Cobro de la deuda \"${deuda.nombre}\"",
+                                ts = ahora
+                            )
+                        )
+                        id
+                    } else {
+                        null
+                    }
+
                     vm.agregarPago(
                         deuda.id,
                         Pago(
@@ -664,7 +726,8 @@ fun App() {
                             metodo = metodo,
                             nota = nota,
                             comprobante = comprobante,
-                            ts = LocalDateTime.now().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                            movimientoId = movimientoId,
+                            ts = ahora
                         )
                     )
                 }
@@ -678,6 +741,10 @@ fun App() {
         DialogoConfirmarBorrar(
             texto = "Se eliminará la deuda \"${deuda.nombre}\" y todos sus pagos. Esto no se puede deshacer.",
             onConfirmar = {
+                // Los depósitos que crearon los pagos de esta deuda se van
+                // con ella: si no, el dinero se quedaría en los ahorros de
+                // una deuda que ya no existe.
+                deuda.pagos.forEach { pago -> pago.movimientoId?.let { vm.eliminar(it) } }
                 vm.eliminarDeuda(deuda.id)
                 if (deudaAbierta == deuda.id) deudaAbierta = null
                 aBorrarDeuda = null
@@ -699,9 +766,17 @@ fun App() {
 
     aBorrarPago?.let { pago ->
         DialogoConfirmarBorrar(
-            texto = "Se eliminará el pago de ${pago.monto.dinero()}. La deuda se recalcula.",
+            texto = if (pago.movimientoId != null) {
+                "Se eliminará el pago de ${pago.monto.dinero()} y el depósito que entró a " +
+                    "los ahorros. La deuda se recalcula."
+            } else {
+                "Se eliminará el pago de ${pago.monto.dinero()}. La deuda se recalcula."
+            },
             onConfirmar = {
                 deudaActual?.let { vm.eliminarPago(it.id, pago.id) }
+                // El depósito que creó este pago se va con él: el dinero
+                // vuelve a estar como estaba antes de cobrar.
+                pago.movimientoId?.let { vm.eliminar(it) }
                 aBorrarPago = null
             },
             onCerrar = { aBorrarPago = null }

@@ -9,9 +9,10 @@ import java.io.File
 /**
  * Los ajustes que la app recuerda entre sesiones.
  *
- * Son tres: **el tema elegido**, **la apariencia** (los colores que el
- * usuario cambió a mano, el fondo y las animaciones) y **las listas que
- * vienen con la app y el usuario borró**.
+ * Son cuatro: **el tema elegido**, **la apariencia** (los colores que el
+ * usuario cambió a mano, el fondo y las animaciones), **las preferencias**
+ * (cómo se relacionan los ahorros con las deudas y con los gastos) y **las
+ * listas que vienen con la app y el usuario borró**.
  *
  * Se guardan en un archivo JSON dentro del almacenamiento interno (como los
  * movimientos y las deudas), así que entra también en la copia de seguridad:
@@ -43,6 +44,15 @@ class Preferencias(private val carpeta: File) {
      * como salió de fábrica.
      */
     fun apariencia(): AjustesApariencia = leer()?.apariencia ?: AjustesApariencia()
+
+    /**
+     * Las preferencias (cómo se relacionan los ahorros con las deudas y los
+     * gastos).
+     *
+     * Los archivos viejos no tienen este campo: sale la de por defecto (las
+     * dos apagadas), así que una app actualizada se comporta como siempre.
+     */
+    fun preferencias(): AjustesPreferencias = leer()?.preferencias ?: AjustesPreferencias()
 
     /**
      * Las listas que vienen con la app (la del salón del 11G) que el usuario
@@ -82,6 +92,11 @@ class Preferencias(private val carpeta: File) {
      */
     fun guardarApariencia(apariencia: AjustesApariencia) {
         escribir((leer() ?: AjustesLocales()).copy(apariencia = apariencia))
+    }
+
+    /** Guarda las preferencias (lo demás se queda como está). */
+    fun guardarPreferencias(preferencias: AjustesPreferencias) {
+        escribir((leer() ?: AjustesLocales()).copy(preferencias = preferencias))
     }
 
     private fun leer(): AjustesLocales? = try {
@@ -126,5 +141,7 @@ data class AjustesLocales(
     /** Ids de las listas que vienen con la app y el usuario borró. */
     val listasBorradas: List<String> = emptyList(),
     /** Los colores, el fondo y las animaciones que el usuario personalizó. */
-    val apariencia: AjustesApariencia = AjustesApariencia()
+    val apariencia: AjustesApariencia = AjustesApariencia(),
+    /** Cómo se relacionan los ahorros con las deudas y con los gastos. */
+    val preferencias: AjustesPreferencias = AjustesPreferencias()
 )

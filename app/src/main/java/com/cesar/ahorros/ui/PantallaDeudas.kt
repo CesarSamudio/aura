@@ -17,11 +17,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -63,7 +66,8 @@ fun PantallaDeudas(
     deudas: List<Deuda>,
     onAbrir: (String) -> Unit,
     onEditar: (Deuda) -> Unit,
-    onEliminar: (Deuda) -> Unit
+    onEliminar: (Deuda) -> Unit,
+    onNuevaIndividual: () -> Unit
 ) {
     val totalPorCobrar = remember(deudas) {
         deudas.filterNot { it.saldada }.sumOf { CalculosDeudas.saldo(it) }
@@ -106,6 +110,25 @@ fun PantallaDeudas(
                     style = MaterialTheme.typography.labelSmall,
                     color = TextoSecundario
                 )
+            }
+        }
+
+        item(key="deuda-individual") {
+            // La deuda individual: le debe a una sola persona, sin lista de
+            // gente ni cuota que repartir.
+            OutlinedButton(
+                onClick = onNuevaIndividual,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(RadioBoton),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = AcentoCalido)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Person,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(10.dp))
+                Text("Nueva deuda individual")
             }
         }
 

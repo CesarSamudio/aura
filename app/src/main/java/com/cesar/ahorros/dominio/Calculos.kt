@@ -27,8 +27,23 @@ data class PuntoCategoria(
 
 object Calculos {
 
-    fun totalAhorro(movimientos: List<Movimiento>): Double =
-        movimientos.filter { it.tipo == Tipo.AHORRO }.sumOf { it.monto }
+    /**
+     * El dinero de los **ahorros**.
+     *
+     * Con [combinarConGastos] apagado (como siempre), es lo depositado: los
+     * gastos y los ahorros son dos montones aparte.
+     *
+     * Con [combinarConGastos] prendido, es lo que **queda**: lo depositado
+     * menos lo gastado. Así, cuando se gasta, los savings bajan (que es
+     * justo lo que quiere quien activa la preferencia de "combinar").
+     */
+    fun totalAhorro(
+        movimientos: List<Movimiento>,
+        combinarConGastos: Boolean = false
+    ): Double {
+        val depositado = movimientos.filter { it.tipo == Tipo.AHORRO }.sumOf { it.monto }
+        return if (combinarConGastos) depositado - totalGasto(movimientos) else depositado
+    }
 
     fun totalGasto(movimientos: List<Movimiento>): Double =
         movimientos.filter { it.tipo == Tipo.GASTO }.sumOf { it.monto }

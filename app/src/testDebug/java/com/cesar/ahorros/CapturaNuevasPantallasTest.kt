@@ -24,8 +24,10 @@ import com.cesar.ahorros.ui.CatalogoTemas
 import com.cesar.ahorros.ui.PantallaAjustes
 import com.cesar.ahorros.ui.PantallaAnadirPersonas
 import com.cesar.ahorros.ui.PantallaDeudaDetalle
+import com.cesar.ahorros.ui.PantallaDeudas
 import com.cesar.ahorros.ui.TemaAhorros
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -295,8 +297,7 @@ class CapturaNuevasPantallasTest {
     // =====================================================================
 
     @Test
-    fun `10 la lista del salon tambien tiene papelera`() {
-        // La lista del salón viene con la app, pero el usuario la puede borrar
+    fun `10 la lista del salon tambien tiene papelera`() {        // La lista del salón viene con la app, pero el usuario la puede borrar
         // (y después devolverla). Antes la papelera solo salía en las listas
         // que había creado el usuario.
         val delSalon = ListaDeGente(
@@ -329,5 +330,114 @@ class CapturaNuevasPantallasTest {
         // La papelera sale en la lista del salón también.
         composeTestRule.onNodeWithContentDescription("Eliminar lista").assertExists()
         guardar("10-lista-del-salon.png", capturarPantalla())
+    }
+
+    // =====================================================================
+    // El apartado nuevo de PREFERENCIAS
+    // =====================================================================
+
+    @Test
+    fun `09e ajustes con las preferencias`() {
+        composeTestRule.setContent {
+            TemaAhorros {
+                PantallaAjustes(
+                    versionApp = "1.16",
+                    temas = CatalogoTemas.todos,
+                    temaActualId = "clasico",
+                    onCambiarTema = { },
+                    onElegirFondo = { },
+                    onQuitarFondo = { },
+                    onVolver = { },
+                    onExportar = { },
+                    onRestaurar = { },
+                    onCerrar = { }
+                )
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        // El apartado existe, pero CERRADO: las opciones no se ven de entrada.
+        composeTestRule.onNodeWithText("Preferencias", ignoreCase = true)
+            .performScrollTo().assertExists()
+        assertTrue(
+            "Las preferencias tienen que empezar cerradas",
+            composeTestRule.onAllNodesWithText("Combinar ahorros con gastos")
+                .fetchSemanticsNodes().isEmpty()
+        )
+
+        // Al abrirlo salen las dos opciones.
+        composeTestRule.onNodeWithText("Ahorros, deudas y gastos")
+            .performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithText("Los pagos de las deudas van a los ahorros")
+            .assertExists()
+        composeTestRule.onNodeWithText("Combinar ahorros con gastos").assertExists()
+        guardar("09e-ajustes-preferencias.png", capturarPantalla())
+    }
+
+    // =====================================================================
+    // La DEUDA INDIVIDUAL
+    // =====================================================================
+
+    private fun deudaIndividual(): Deuda = Deuda(
+        id = "d1",
+        nombre = "Pedro",
+        modo = ModoDeuda.META,
+        total = 40.0,
+        personasQuePagan = 1,
+        cuotaAutomatica = false,
+        personas = listOf(PersonaDeuda(id = "p1", nombre = "Pedro")),
+        individual = true,
+        ts = ts(1, LocalTime.of(9, 30))
+    )
+
+    @Test
+    fun `11 la lista de deudas ofrece la deuda individual`() {
+        composeTestRule.setContent {
+            TemaAhorros {
+                PantallaDeudas(
+                    deudas = listOf(deudaIndividual()),
+                    onAbrir = { },
+                    onEditar = { },
+                    onEliminar = { },
+                    onNuevaIndividual = { }
+                )
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithText("Nueva deuda individual").assertExists()
+        guardar("11-deudas.png", capturarPantalla())
+    }
+
+    @Test
+    fun `11b el detalle de una deuda individual no deja anadir gente`() {
+        composeTestRule.setContent {
+            TemaAhorros {
+                PantallaDeudaDetalle(
+                    deuda = deudaIndividual(),
+                    onVolver = { },
+                    onAgregarPersona = { },
+                    onEditarPersona = { },
+                    onEliminarPersona = { },
+                    onRegistrarPago = { },
+                    onEliminarPago = { },
+                    onAlternarSaldada = { },
+                    onEditar = { },
+                    onEliminar = { },
+                    onVerComprobante = { },
+                    onAdjuntarPrueba = { }
+                )
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        // Es individual: no hay lista de personas, así que el botón no sale.
+        assertTrue(
+            "Una deuda individual no puede añadir gente",
+            composeTestRule.onAllNodesWithText("Añadir personas").fetchSemanticsNodes().isEmpty()
+        )
+        guardar("11b-detalle-deuda-individual.png", capturarPantalla())
     }
 }

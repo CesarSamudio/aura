@@ -89,6 +89,15 @@ data class Pago(
     val metodo: MetodoPago,
     val nota: String = "",
     val comprobante: String? = null,
+    /**
+     * El movimiento de ahorro que creó este pago.
+     *
+     * Solo existe si la preferencia de "los pagos de las deudas van a los
+     * ahorros" está **prendida**. Se guarda el id para que, si después se
+     * borra el pago, se borre también el depósito: los dos van y vienen
+     * juntos (si no, el dinero se quedaría en los ahorros para siempre).
+     */
+    val movimientoId: String? = null,
     val ts: Long
 ) {
     val momento: LocalDateTime
@@ -158,5 +167,16 @@ data class Deuda(
     val personas: List<PersonaDeuda> = emptyList(),
     val pagos: List<Pago> = emptyList(),
     val saldada: Boolean = false,
+    /**
+     * Si la deuda es **individual**: le debe a una sola persona.
+     *
+     * En ese caso no hay lista de personas que añadir: la deuda tiene una
+     * sola (la que le debe) y su nombre ES el nombre de la deuda. Todo lo
+     * demás sigue igual: el modo, los montos, los pagos y el comprobante.
+     *
+     * Los archivos viejos del teléfono no tienen este campo: sale `false`
+     * (una deuda normal, como siempre).
+     */
+    val individual: Boolean = false,
     val ts: Long
 )

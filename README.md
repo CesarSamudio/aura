@@ -13,10 +13,10 @@ Hay dos versiones de la misma app. La diferencia es **una sola lista de 24 nombr
 
 | Versión | Para quién | Archivo |
 |---|---|---|
-| **Aura v1.16** | Cualquiera | [`apk/Aura-v1.16.apk`](apk/Aura-v1.16.apk) |
-| **Aura 11G v1.16** | Los del 11G: trae la lista del salón ya escrita | [`apk/Aura-v1.16-11G.apk`](apk/Aura-v1.16-11G.apk) |
+| **Aura v1.17** | Cualquiera | [`apk/Aura-v1.17.apk`](apk/Aura-v1.17.apk) |
+| **Aura 11G v1.17** | Los del 11G: trae la lista del salón ya escrita | [`apk/Aura-v1.17-11G.apk`](apk/Aura-v1.17-11G.apk) |
 
-> **Instalá `Aura-v1.16.apk` si no sos del 11G.**
+> **Instalá `Aura-v1.17.apk` si no sos del 11G.**
 > La del 11G es EXACTAMENTE la misma app con la lista del salón escrita de antemano
 > (para no tener que teclear los 24 nombres). Además instala con otro paquete, así que
 > las dos conviven en el mismo teléfono sin pisarse.
@@ -24,7 +24,7 @@ Hay dos versiones de la misma app. La diferencia es **una sola lista de 24 nombr
 Para instalar: copiá el `.apk` al teléfono y abrilo. Android va a pedir permiso para
 instalar apps de fuentes desconocidas: es normal, es el aviso de siempre.
 
-Si preferís bajarlo de GitHub, los mismos `.apk` están en la [release v1.16](https://github.com/CesarSamudio/aura/releases/tag/v1.16).
+Si preferís bajarlo de GitHub, los mismos `.apk` están en la [release v1.17](https://github.com/CesarSamudio/aura/releases/tag/v1.17).
 
 ## Qué hace
 
@@ -49,6 +49,16 @@ Si preferís bajarlo de GitHub, los mismos `.apk` están en la [release v1.16](h
   malla), con su opacidad, velocidad e intensidad. El movimiento es **un bucle
   continuo**: el fondo nunca da un salto cuando el ciclo termina, y la velocidad se
   aplica al instante (se nota en la vista previa, sin salir de Ajustes).
+- **Preferencias** (Ajustes → Preferencias): dos interruptores que cambian **cómo se
+  cuentan** los números, y se aplican al instante:
+  - *Los pagos de las deudas van a los ahorros*: cuando marcás a alguien como pagado,
+    el dinero también se suma a tus ahorros (y si después borrás ese pago, el depósito
+    se borra con él).
+  - *Combinar ahorros con gastos*: al gastar, los ahorros bajan: lo que tenés es lo
+    que metiste menos lo que gastaste.
+- **Deuda individual**: un tipo de deuda para **una sola persona**. No hay lista de
+  gente ni cuota que repartir (el nombre de la persona es el de la deuda), pero todo
+  lo demás sigue igual: los montos, los pagos y el comprobante.
 - **Animaciones a tu medida**: las gráficas, los números y la interfaz se pueden
   apagar, acelerar o frenar, y cada cosa tiene su estilo. Apretando y soltando
   una opción te explica qué hace.

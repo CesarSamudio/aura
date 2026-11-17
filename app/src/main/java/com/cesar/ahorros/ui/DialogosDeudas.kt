@@ -97,6 +97,7 @@ import java.io.File
 @Composable
 fun DialogoDeuda(
     inicial: Deuda?,
+    individual: Boolean = false,
     onGuardar: (
         nombre: String,
         modo: ModoDeuda,
@@ -135,8 +136,15 @@ fun DialogoDeuda(
     }
     var personasTexto by remember {
         // Si la deuda está en cuota automática, el campo arranca vacío: así se
-        // ve que el número es opcional.
-        mutableStateOf(inicial?.personasQuePagan?.coerceAtLeast(1)?.toString() ?: "")
+        // ve que el número es opcional. En una deuda individual no hay campo:
+        // le debe a una sola persona.
+        mutableStateOf(
+            if (individual) {
+                "1"
+            } else {
+                inicial?.personasQuePagan?.coerceAtLeast(1)?.toString() ?: ""
+            }
+        )
     }
     // La cuota a mano (solo en modo META): vacía = se divide el costo como
     // siempre. Si la deuda ya la tenía, el campo arranca con ese valor.
@@ -148,12 +156,13 @@ fun DialogoDeuda(
     val totalValido = total != null && total > 0.0
     val monto = montoTexto.replace(",", ".").toDoubleOrNull()
     val montoValido = monto != null && monto > 0.0
-    val personas = personasTexto.trim().toIntOrNull()
+    val personas = if (individual) 1 else personasTexto.trim().toIntOrNull()
     // Vacío es VÁLIDO: la cuota se calcula con la gente de la lista (cuota
     // automática). Si tiene algo, tiene que ser un número mayor que cero.
-    val personasValido = personas == null || personas >= 1
-    // Sin número = cuota automática: manda la lista de personas.
-    val automatico = personas == null
+    val personasValido = individual || personas == null || personas >= 1
+    // Sin número = cuota automática: manda la lista de personas. En una
+    // deuda individual nunca hay cuota automática: es una sola persona.
+    val automatico = !individual && personas == null
     // Vacía es válido (se divide el costo); si tiene algo, tiene que ser un
     // número mayor que cero.
     val cuota = cuotaTexto.replace(",", ".").toDoubleOrNull()
@@ -208,7 +217,14 @@ fun DialogoDeuda(
     AlertDialog(
         onDismissRequest = onCerrar,
         title = {
-            Text(text = if (inicial == null) "Nueva deuda" else "Editar deuda")
+            Text(
+                text = when {
+                    individual && inicial == null -> "Nueva deuda individual"
+                    individual -> "Editar deuda individual"
+                    inicial == null -> "Nueva deuda"
+                    else -> "Editar deuda"
+                }
+            )
         },
         text = {
             Column(
@@ -249,8 +265,8 @@ fun DialogoDeuda(
                 OutlinedTextField(
                     value = nombre,
                     onValueChange = { if (it.length <= 40) nombre = it },
-                    label = { Text("Nombre de la deuda") },
-                    placeholder = { Text("Ejemplo: banner") },
+                    label = { Text(if (individual) "Nombre de la persona" else "Nombre de la deuda") },
+                    placeholder = { Text(if (individual) "Ejemplo: Pedro" else "Ejemplo: banner") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -320,27 +336,45 @@ fun DialogoDeuda(
                 }
 
                 Spacer(Modifier.height(14.dp))
-                OutlinedTextField(
-                    value = personasTexto,
-                    onValueChange = { entrada ->
-                        if (entrada.isEmpty() || entrada.all { it.isDigit() }) {
-                            personasTexto = entrada
-                        }
-                    },
-                    label = { Text("¿Cuántas personas lo van a pagar?") },
-                    placeholder = { Text("Ejemplo: 4") },
-                    singleLine = true,
-                    isError = personasTexto.isNotEmpty() && !personasValido,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = "Opcional: si no sabés cuántos van a pagar, dejalo vacío " +
-                        "y la cuota se calcula con la gente que añadas.",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = TextoSecundario
-                )
+                // En una deuda individual no hay lista de personas: le debe
+                // a una sola, así que el campo no tiene sentido.
+                if (individual) {
+                    Surface(
+                        color = AcentoCalido.copy(alpha = 0.14f),
+                        shape = RoundedCornerShape(RadioChip),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "Es una deuda individual: solo le debe a esta persona, " +
+                                "así que no hay lista de gente ni cuota que repartir.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = AcentoCalido,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                        )
+                    }
+                } else {
+                    OutlinedTextField(
+                        value = personasTexto,
+                        onValueChange = { entrada ->
+                            if (entrada.isEmpty() || entrada.all { it.isDigit() }) {
+                                personasTexto = entrada
+                            }
+                        },
+                        label = { Text("¿Cuántas personas lo van a pagar?") },
+                        placeholder = { Text("Ejemplo: 4") },
+                        singleLine = true,
+                        isError = personasTexto.isNotEmpty() && !personasValido,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "Opcional: si no sabés cuántos van a pagar, dejalo vacío " +
+                            "y la cuota se calcula con la gente que añadas.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextoSecundario
+                    )
+                }
 
                 Spacer(Modifier.height(12.dp))
                 // Con el número a mano, el número es el que divide: la cuota
@@ -353,10 +387,14 @@ fun DialogoDeuda(
                 ) {
                     Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
                         Text(
-                            text = when (modo) {
-                                ModoDeuda.META -> "Cada uno paga: " +
+                            text = when {
+                                individual && modo == ModoDeuda.META -> "Esta persona paga: " +
                                     (cuotaPrevia?.dineroSimbolo() ?: sinNumero)
-                                ModoDeuda.LIBRE -> "Total a cobrar: " +
+                                individual -> "Total a cobrar: " +
+                                    (totalPrevio?.dineroSimbolo() ?: sinNumero)
+                                modo == ModoDeuda.META -> "Cada uno paga: " +
+                                    (cuotaPrevia?.dineroSimbolo() ?: sinNumero)
+                                else -> "Total a cobrar: " +
                                     (totalPrevio?.dineroSimbolo() ?: sinNumero)
                             },
                             style = MaterialTheme.typography.titleMedium,
@@ -364,6 +402,16 @@ fun DialogoDeuda(
                         )
                         Text(
                             text = when {
+                                // Deuda individual: no hay lista, así que no
+                                // hay nada que repartir ni que explicar.
+                                individual && modo == ModoDeuda.META && !totalValido ->
+                                    "Pon el costo total para ver cuánto le toca."
+                                individual && modo == ModoDeuda.META ->
+                                    "Le toca pagar ${total?.dineroSimbolo() ?: "—"}."
+                                individual && modo == ModoDeuda.LIBRE && !montoValido ->
+                                    "Pon el monto para ver el total."
+                                individual ->
+                                    "Total a cobrar: ${totalPrevio?.dineroSimbolo() ?: "—"}."
                                 // Cuota automática sin nadie en la lista: no hay
                                 // número que dar todavía.
                                 automatico && !hayGente ->
@@ -428,7 +476,18 @@ fun DialogoDeuda(
                 }
 
                 Spacer(Modifier.height(12.dp))
-                if (inicial == null) {
+                if (individual) {
+                    Text(
+                        text = if (inicial == null) {
+                            "La persona queda agregada sola: después solo hay que marcar " +
+                                "cuánto pagó."
+                        } else {
+                            "Esta deuda es de una sola persona: no se le puede añadir más gente."
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextoSecundario
+                    )
+                } else if (inicial == null) {
                     Text(
                         text = when {
                             automatico -> "Después de crear la deuda agregas a las " +

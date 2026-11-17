@@ -27,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.cesar.ahorros.data.Movimiento
 import com.cesar.ahorros.data.Tipo
+import com.cesar.ahorros.dominio.Calculos
 import java.time.LocalDate
 
 private data class GrupoDia(
@@ -53,7 +54,18 @@ fun PantallaMovimiento(
 ) {
     val esAhorro = tipo == Tipo.AHORRO
     val propios = movimientos.filter { it.tipo == tipo }
-    val total = propios.sumOf { it.monto }
+    // "Combinar ahorros con gastos": el dinero de los ahorros pasa a ser lo
+    // que QUEDA (lo depositado menos lo gastado), así que al gastar, los
+    // ahorros bajan. Sin la preferencia, son dos montones aparte.
+    val combinar = PreferenciasActual.combinarAhorrosYGastos
+    val total = if (esAhorro && combinar) {
+        Calculos.totalAhorro(movimientos, combinarConGastos = true)
+    } else {
+        propios.sumOf { it.monto }
+    }
+    // Lo depositado sin descontar: cuando se combinan, se muestra aparte
+    // (el número de arriba ya es el balance).
+    val depositado = if (esAhorro) Calculos.totalAhorro(movimientos) else 0.0
     val colorPrincipal = if (esAhorro) AcentoMenta else ColorGasto
 
     val grupos = remember(movimientos, tipo) {
@@ -77,12 +89,19 @@ fun PantallaMovimiento(
                 etiqueta = if (esAhorro) "AHORROS" else "GASTOS",
                 total = total,
                 color = colorPrincipal,
-                pie = if (esAhorro) {
-                    "Total depositado · ${propios.size} movimientos"
-                } else {
-                    "Total gastado · ${propios.size} movimientos"
+                pie = when {
+                    // Con la preferencia prendida, el número ya viene restado:
+                    // se dice de dónde sale.
+                    esAhorro && combinar ->
+                        "Después de tus gastos · ${propios.size} depósitos"
+                    esAhorro ->
+                        "Total depositado · ${propios.size} movimientos"
+                    else ->
+                        "Total gastado · ${propios.size} movimientos"
                 },
                 balance = balance,
+                depositado = depositado,
+                combinar = esAhorro && combinar,
                 esAhorro = esAhorro
             )
             Spacer(Modifier.height(18.dp))
@@ -144,6 +163,8 @@ private fun EncabezadoPantalla(
     color: Color,
     pie: String,
     balance: Double,
+    depositado: Double,
+    combinar: Boolean,
     esAhorro: Boolean
 ) {
     Column {
@@ -178,13 +199,20 @@ private fun EncabezadoPantalla(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = if (esAhorro) "Balance actual" else "Te queda disponible",
+                text = when {
+                    // Con "combinar" el número de arriba ya es el balance:
+                    // abajo se muestra lo depositado sin restar, para no ver
+                    // el mismo número dos veces.
+                    combinar -> "Total depositado"
+                    esAhorro -> "Balance actual"
+                    else -> "Te queda disponible"
+                },
                 style = MaterialTheme.typography.labelLarge,
                 color = TextoSecundario,
                 modifier = Modifier.weight(1f)
             )
             Text(
-                text = balance.dineroSimbolo(),
+                text = (if (combinar) depositado else balance).dineroSimbolo(),
                 style = MaterialTheme.typography.titleMedium,
                 color = if (balance < 0) ColorGasto else AcentoMenta,
                 fontWeight = FontWeight.Bold

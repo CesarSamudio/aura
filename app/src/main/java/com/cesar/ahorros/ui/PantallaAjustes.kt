@@ -61,13 +61,17 @@ import com.cesar.ahorros.data.FondosApp
  *  1. **Apariencia**: los temas de fábrica (un plegable) y el tema
  *     personalizado (otro plegable, con los colores, el fondo y las
  *     animaciones adentro).
- *  2. **Copia de seguridad**: el `.zip` que el usuario guarda donde él quiera
+ *  2. **Preferencias**: cómo se relacionan los ahorros con las deudas y con
+ *     los gastos (un plegable).
+ *  3. **Copia de seguridad**: el `.zip` que el usuario guarda donde él quiera
  *     (Drive, WhatsApp, correo...) y que puede volver a meter cuando la
  *     necesite.
- *  3. **Acerca de**: la app, su versión y dónde viven los datos.
+ *  4. **Acerca de**: la app, su versión y dónde viven los datos.
  *
  * Dentro de la primera sección todo lo nuevo está en plegables: el usuario
- * ve "Temas" y "Tema personalizado", y solo abre lo que le interesa.
+ * ve "Temas" y "Tema personalizado", y solo abre lo que le interesa. Las
+ * preferencias también van en un plegable: son dos cosas, y de entrada no
+ * interestan a todo el mundo.
  *
  * No hay nube ni cuentas: la app no tiene ningún permiso y no habla con
  * nadie.
@@ -510,7 +514,57 @@ fun PantallaAjustes(
         Spacer(Modifier.height(18.dp))
 
         // ------------------------------------------------------------------
-        // 2. Copia de seguridad
+        // 2. Preferencias
+        // ------------------------------------------------------------------
+        TituloSeccion("Preferencias")
+
+        SeccionPlegable(
+            titulo = "Ahorros, deudas y gastos",
+            subtitulo = "Cómo se relacionan entre sí tus tres montos.",
+            onExplicacion = {
+                explicacion = Explicacion(
+                    "Ahorros, deudas y gastos",
+                    "Estas dos opciones cambian CÓMO se cuentan los números. Vienen " +
+                        "apagadas: la app se comporta como siempre hasta que las prendés.\n\n" +
+                        "• «Los pagos de las deudas van a los ahorros»: cuando marcás a " +
+                        "alguien como pagado de una deuda, el dinero también se suma a tus " +
+                        "ahorros (como un depósito más). Si después borrás ese pago, el " +
+                        "depósito se borra también.\n\n" +
+                        "• «Combinar ahorros con gastos»: en vez de dos montones aparte, los " +
+                        "ahorros y los gastos se juntan en uno. Lo que tenés es lo que " +
+                        "metiste menos lo que gastaste, así que al gastar, los ahorros bajan."
+                )
+            }
+        ) {
+            FilaInterruptor(
+                titulo = "Los pagos de las deudas van a los ahorros",
+                descripcion = "Cuando marcás a alguien como pagado, el dinero también " +
+                    "se suma a tus ahorros.",
+                valor = PreferenciasActual.pagosDeDeudasEnAhorros,
+                onCambio = { nuevo ->
+                    PreferenciasActual.preferencias =
+                        PreferenciasActual.preferencias.copy(pagosDeDeudasEnAhorros = nuevo)
+                }
+            )
+
+            Spacer(Modifier.height(14.dp))
+
+            FilaInterruptor(
+                titulo = "Combinar ahorros con gastos",
+                descripcion = "Cuando gastás, el dinero baja de tus ahorros: lo que tenés " +
+                    "es lo que metiste menos lo que gastaste.",
+                valor = PreferenciasActual.combinarAhorrosYGastos,
+                onCambio = { nuevo ->
+                    PreferenciasActual.preferencias =
+                        PreferenciasActual.preferencias.copy(combinarAhorrosYGastos = nuevo)
+                }
+            )
+        }
+
+        Spacer(Modifier.height(18.dp))
+
+        // ------------------------------------------------------------------
+        // 3. Copia de seguridad
         // ------------------------------------------------------------------
         TituloSeccion("Copia de seguridad")
 
@@ -586,7 +640,7 @@ fun PantallaAjustes(
         }
 
         // ------------------------------------------------------------------
-        // 3. Acerca de (aquí viven también los datos de la app)
+        // 4. Acerca de (aquí viven también los datos de la app)
         // ------------------------------------------------------------------
         Spacer(Modifier.height(18.dp))
         TituloSeccion("Acerca de")

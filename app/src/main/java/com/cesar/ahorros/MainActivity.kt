@@ -12,6 +12,7 @@ import androidx.compose.ui.graphics.toArgb
 import com.cesar.ahorros.data.Preferencias
 import com.cesar.ahorros.ui.AparienciaActual
 import com.cesar.ahorros.ui.App
+import com.cesar.ahorros.ui.PreferenciasActual
 import com.cesar.ahorros.ui.TemaActual
 import com.cesar.ahorros.ui.TemaAhorros
 
@@ -26,6 +27,11 @@ class MainActivity : ComponentActivity() {
         // fondo y las animaciones) se cargan ANTES de pintar nada: si no,
         // la app aparecería con el tema viejo y cambiaría delante del usuario.
         AparienciaActual.cargar(preferencias.apariencia())
+
+        // Las preferencias (cómo se relacionan los ahorros con las deudas y
+        // con los gastos) también se cargan antes de pintar: si no, la app
+        // arrancaría contando los números a la manera vieja.
+        PreferenciasActual.cargar(preferencias.preferencias())
 
         // El tema que eligió el usuario se aplica ANTES de pintar nada: así la
         // app no aparece con el tema viejo y cambia al nuevo delante de él.

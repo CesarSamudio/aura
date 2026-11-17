@@ -3,8 +3,10 @@ package com.cesar.ahorros
 import com.cesar.ahorros.data.AjustesAnimacion
 import com.cesar.ahorros.data.AjustesApariencia
 import com.cesar.ahorros.data.AjustesFondo
+import com.cesar.ahorros.data.AjustesPreferencias
 import com.cesar.ahorros.data.Preferencias
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -194,5 +196,59 @@ class PreferenciasTest {
 
         val preferencias = Preferencias(carpeta.root)
         assertEquals("osmo", preferencias.temaId())
+    }
+
+    // ---------------------------------------------------------------------
+    // Las preferencias
+    // ---------------------------------------------------------------------
+
+    @Test
+    fun `las preferencias salen apagadas de fabrica`() {
+        // La app se comporta como siempre hasta que el usuario las prende.
+        val preferencias = Preferencias(carpeta.root)
+        assertFalse(preferencias.preferencias().pagosDeDeudasEnAhorros)
+        assertFalse(preferencias.preferencias().combinarAhorrosYGastos)
+    }
+
+    @Test
+    fun `las preferencias se guardan y se vuelven a leer`() {
+        val preferencias = Preferencias(carpeta.root)
+        val ajustes = AjustesPreferencias(
+            pagosDeDeudasEnAhorros = true,
+            combinarAhorrosYGastos = true
+        )
+        preferencias.guardarPreferencias(ajustes)
+
+        assertEquals(ajustes, Preferencias(carpeta.root).preferencias())
+    }
+
+    @Test
+    fun `un archivo de ajustes viejo se sigue leyendo con las preferencias apagadas`() {
+        // El archivo que quedó del teléfono es el viejo: no tiene el campo
+        // de las preferencias. Tiene que seguir cargando.
+        val archivo = File(carpeta.root, Preferencias.NOMBRE_ARCHIVO)
+        archivo.writeText("""{"tema":"osmo"}""")
+
+        val preferencias = Preferencias(carpeta.root)
+        assertEquals("osmo", preferencias.temaId())
+        assertFalse(preferencias.preferencias().pagosDeDeudasEnAhorros)
+        assertFalse(preferencias.preferencias().combinarAhorrosYGastos)
+    }
+
+    @Test
+    fun `guardar las preferencias no borra la apariencia ni el tema`() {
+        // Las preferencias viven en el MISMO archivo que el tema y la
+        // apariencia: guardar uno no puede borrar lo que ya estaba.
+        val preferencias = Preferencias(carpeta.root)
+        preferencias.guardarTema("trunk")
+        preferencias.guardarApariencia(
+            AjustesApariencia(coloresTema = mapOf("FONDO" to "#101010"))
+        )
+        preferencias.guardarPreferencias(AjustesPreferencias(combinarAhorrosYGastos = true))
+
+        val otra = Preferencias(carpeta.root)
+        assertEquals("trunk", otra.temaId())
+        assertEquals("#101010", otra.apariencia().coloresTema["FONDO"])
+        assertTrue(otra.preferencias().combinarAhorrosYGastos)
     }
 }

@@ -371,18 +371,22 @@ fun PantallaDeudaDetalle(
             )
         }
 
-        item(key = "agregar-persona") {
-            OutlinedButton(
-                onClick = onAgregarPersona,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Add,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(Modifier.width(8.dp))
-                Text("Añadir personas")
+        // En una deuda individual no hay lista de personas: le debe a una
+        // sola, así que la opción de "añadir gente" no tiene sentido.
+        if (!deuda.individual) {
+            item(key = "agregar-persona") {
+                OutlinedButton(
+                    onClick = onAgregarPersona,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Add,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Añadir personas")
+                }
             }
         }
 
